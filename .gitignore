@@ -54,3 +54,4 @@ coverage/
 .DS_Store
 Thumbs.db
 *.swp
+.neon

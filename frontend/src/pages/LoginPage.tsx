@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
 import { useI18n } from '../i18n/I18nProvider'
 import { useErrorText } from '../i18n/useErrorText'
+import { safeAppPath } from '../lib/safePath'
 import { AuthLayout } from './AuthLayout'
 
 export function LoginPage() {
@@ -13,7 +14,7 @@ export function LoginPage() {
   const errorText = useErrorText()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = safeReturnPath((location.state as { from?: unknown } | null)?.from)
+  const from = safeAppPath((location.state as { from?: unknown } | null)?.from) ?? '/'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<unknown>(null)
@@ -67,9 +68,4 @@ export function LoginPage() {
       </form>
     </AuthLayout>
   )
-}
-
-/** Only paths inside this app ("/games"), never another site ("//evil.example", "https://…"). */
-function safeReturnPath(from: unknown): string {
-  return typeof from === 'string' && /^\/(?![/\\])/.test(from) ? from : '/'
 }

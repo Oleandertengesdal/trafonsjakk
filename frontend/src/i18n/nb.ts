@@ -37,6 +37,7 @@ export const nb: Dict = {
     admin: 'Admin',
     logGame: 'Registrer parti',
     logOut: 'Logg ut',
+    reportProblem: 'Meld fra om feil',
     skipToContent: 'Hopp til innholdet',
     waitingForYou: (n) => `${n} venter på deg`,
   },
@@ -450,6 +451,24 @@ export const nb: Dict = {
     disable: 'Deaktiver',
     enable: 'Aktiver',
     userUpdated: 'Brukeren er oppdatert.',
+  },
+
+  feedback: {
+    title: 'Fant du en feil?',
+    subtitle: 'Send oss en e-post, så ser vi på det.',
+    helps: 'Dette hjelper oss å finne feilen:',
+    help1: 'Hva du gjorde',
+    help2: 'Hva som skjedde, og hva du ventet',
+    help3: 'Mobil eller PC, og hvilken nettleser',
+    write: 'Skriv e-post',
+    orSendTo: 'Eller send den til',
+    copy: 'Kopier adressen',
+    copied: 'Kopiert',
+    back: 'Tilbake til Trafonsjakk',
+    subject: 'Feil på Trafonsjakk',
+    bodyWhat: 'Hva gjorde du, og hva skjedde?',
+    bodyPage: (url: string) => `Side: ${url}`,
+    link: 'Fant du en feil?',
   },
 
   notFound: {

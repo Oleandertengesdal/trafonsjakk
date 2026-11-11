@@ -36,6 +36,7 @@ export const en = {
     admin: 'Admin',
     logGame: 'Log game',
     logOut: 'Log out',
+    reportProblem: 'Report a problem',
     skipToContent: 'Skip to content',
     waitingForYou: (n: number) => `${n} waiting for you`,
   },
@@ -450,6 +451,24 @@ export const en = {
     disable: 'Disable',
     enable: 'Enable',
     userUpdated: 'User updated.',
+  },
+
+  feedback: {
+    title: 'Found a problem?',
+    subtitle: "Send us an email and we'll look into it.",
+    helps: 'This helps us find it:',
+    help1: 'What you did',
+    help2: 'What happened, and what you expected',
+    help3: 'Phone or computer, and which browser',
+    write: 'Write an email',
+    orSendTo: 'Or send it to',
+    copy: 'Copy address',
+    copied: 'Copied',
+    back: 'Back to Trafonsjakk',
+    subject: 'Problem on Trafonsjakk',
+    bodyWhat: 'What did you do, and what happened?',
+    bodyPage: (url: string) => `Page: ${url}`,
+    link: 'Found a problem?',
   },
 
   notFound: {

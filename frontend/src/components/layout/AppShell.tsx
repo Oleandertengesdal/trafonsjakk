@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { House, ListOrdered, LogOut, Plus, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound } from 'lucide-react'
+import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound } from 'lucide-react'
 import { gamesApi } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthProvider'
 import { useI18n } from '../../i18n/I18nProvider'
@@ -35,6 +35,7 @@ export function AppShell() {
     { to: '/invites', label: t.nav.invites, icon: Ticket },
     { to: '/settings', label: t.nav.settings, icon: Settings },
     ...(me.role === 'ADMIN' ? [{ to: '/admin', label: t.nav.admin, icon: Shield }] : []),
+    { to: `/feedback?from=${encodeURIComponent(pathname)}`, label: t.nav.reportProblem, icon: MessageSquareWarning },
   ]
 
   return (

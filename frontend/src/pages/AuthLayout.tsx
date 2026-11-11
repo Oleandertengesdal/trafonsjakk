@@ -1,12 +1,26 @@
 import type { ReactNode } from 'react'
+import { Link, useLocation } from 'react-router'
 import { LogoMark, Wordmark } from '../components/brand/LogoMark'
 import { TrafonFacade } from '../components/brand/TrafonFacade'
 import { LanguageSwitch } from '../components/ui/LanguageSwitch'
 import { useI18n } from '../i18n/I18nProvider'
 
 /** Login/register frame: the Trafon facade beside the form. */
-export function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer: ReactNode }) {
+export function AuthLayout({
+  title,
+  subtitle,
+  children,
+  footer,
+  showFeedbackLink = true,
+}: {
+  title: string
+  subtitle: string
+  children: ReactNode
+  footer: ReactNode
+  showFeedbackLink?: boolean
+}) {
   const { t } = useI18n()
+  const { pathname } = useLocation()
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <div className="relative hidden flex-col justify-between overflow-hidden border-r border-line bg-accent-soft p-12 lg:flex">
@@ -33,6 +47,11 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
           <p className="mt-1.5 text-muted">{subtitle}</p>
           <div className="mt-8">{children}</div>
           <div className="mt-8 text-[0.9375rem] text-muted">{footer}</div>
+          {showFeedbackLink && (
+            <Link to={`/feedback?from=${encodeURIComponent(pathname)}`} className="mt-3 text-sm text-faint hover:text-muted hover:underline">
+              {t.feedback.link}
+            </Link>
+          )}
         </div>
       </div>
     </div>

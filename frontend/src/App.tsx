@@ -8,6 +8,7 @@ import { AppShell } from './components/layout/AppShell'
 import { Skeleton } from './components/ui/Skeleton'
 import { ToastProvider } from './components/ui/Toast'
 import { I18nProvider } from './i18n/I18nProvider'
+import { FeedbackPage } from './pages/FeedbackPage'
 import { GamesPage } from './pages/GamesPage'
 import { HomePage } from './pages/HomePage'
 import { LeaderboardPage } from './pages/LeaderboardPage'
@@ -37,6 +38,8 @@ export function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                {/* Public on purpose: people who can't log in can report that too */}
+                <Route path="/feedback" element={<FeedbackPage />} />
                 <Route
                   element={
                     <RequireAuth>

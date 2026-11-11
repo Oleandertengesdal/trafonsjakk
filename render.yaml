@@ -1,0 +1,28 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Creates the API as a free Docker web service. The database lives on Neon (see docs/DEPLOYMENT.md).
+services:
+  - type: web
+    name: trafonsjakk-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: JWT_SECRET
+        generateValue: true       # Render generates a random 256-bit value
+      - key: DATABASE_URL
+        sync: false               # set in the dashboard, e.g. jdbc:postgresql://<host>/<db>?sslmode=require
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_INVITE_CODE
+        sync: false               # set once to create the first admin, then delete it

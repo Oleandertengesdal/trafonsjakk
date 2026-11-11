@@ -1,0 +1,11 @@
+# Secret scanning config (used by CI). Extends the default rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented local-development placeholders (not secrets)"
+regexes = [
+  '''dev-only-insecure-jwt-secret-change-me-0123456789''',
+  '''POSTGRES_PASSWORD: trafonsjakk''',
+  '''test-only-jwt-secret-not-used-anywhere-else-0123456789''',
+]

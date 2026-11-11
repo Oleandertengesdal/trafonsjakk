@@ -1,16 +1,28 @@
-# Compiled class file
+# ---------------------------------------------------------------
+# Secrets: never commit these. Use the *.example files as templates.
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.env
+!*.env.example
+application-local.yml
+application-local.properties
+application-secrets.*
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+secrets/
+.vercel/
+
+# ---------------------------------------------------------------
+# Java / Maven
+# ---------------------------------------------------------------
+target/
 *.class
-
-# Log file
 *.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
@@ -18,7 +30,27 @@
 *.zip
 *.tar.gz
 *.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+!.mvn/wrapper/maven-wrapper.jar
+
+# ---------------------------------------------------------------
+# Node / Vite
+# ---------------------------------------------------------------
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+npm-debug.log*
+coverage/
+
+# ---------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.swp

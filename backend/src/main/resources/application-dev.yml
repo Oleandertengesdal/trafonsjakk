@@ -1,0 +1,21 @@
+# LOCAL DEVELOPMENT ONLY.
+# These defaults match docker-compose.yml and only work against a database on localhost.
+# They are not secrets. The `prod` profile rejects the dev JWT secret.
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/trafonsjakk}
+    username: ${DATABASE_USERNAME:trafonsjakk}
+    password: ${DATABASE_PASSWORD:trafonsjakk}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-insecure-jwt-secret-change-me-0123456789}
+  cookies:
+    # Local dev runs over plain http://localhost
+    secure: false
+  bootstrap-invite-code: ${BOOTSTRAP_INVITE_CODE:let-me-in}
+
+logging:
+  level:
+    no.trafonsjakk: DEBUG

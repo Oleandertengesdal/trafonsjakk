@@ -1,0 +1,83 @@
+# Shared configuration. Secrets are NEVER written here: they come from environment variables.
+# Profiles: `dev` (local, see application-dev.yml) and `prod` (Render, see application-prod.yml).
+
+spring:
+  application:
+    name: trafonsjakk-api
+  profiles:
+    default: dev
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: 0
+      idle-timeout: 120000
+      connection-timeout: 20000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+  servlet:
+    session:
+      tracking-modes: cookie
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+app:
+  jwt:
+    # Base64 or raw string, at least 32 bytes. Generate: openssl rand -base64 48
+    secret: ${JWT_SECRET:}
+    issuer: trafonsjakk
+    access-token-ttl: 15m
+    refresh-token-ttl: 30d
+  cookies:
+    secure: true
+  bootstrap-invite-code: ${BOOTSTRAP_INVITE_CODE:}
+  games:
+    auto-confirm-after: 48h
+  invites:
+    ttl: 7d
+    max-active-per-user: 5
+  security:
+    max-failed-logins-per-user: 5
+    max-failed-logins-per-ip: 20
+    lockout-duration: 15m
+    max-registrations-per-ip-per-hour: 10
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN

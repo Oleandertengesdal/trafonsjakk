@@ -1,0 +1,21 @@
+# Local development database. Credentials here are dev-only placeholders and are bound to localhost.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trafonsjakk-db
+    environment:
+      POSTGRES_DB: trafonsjakk
+      POSTGRES_USER: trafonsjakk
+      POSTGRES_PASSWORD: trafonsjakk
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - trafonsjakk-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trafonsjakk -d trafonsjakk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  trafonsjakk-db:

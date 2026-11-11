@@ -1,0 +1,137 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens, drawn from the Trafon building: red-painted facade, cream window trim,
+ * slate roof. Light is the default; [data-theme='dark'] is a separately tuned evening palette.
+ */
+@theme inline {
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --color-page: var(--c-page);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-line: var(--c-line);
+  --color-ink: var(--c-ink);
+  --color-muted: var(--c-muted);
+  --color-faint: var(--c-faint);
+  --color-accent: var(--c-accent);
+  --color-brand: var(--c-brand);
+  --color-brand-hover: var(--c-brand-hover);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-on-accent: var(--c-on-accent);
+  --color-win: var(--c-win);
+  --color-loss: var(--c-loss);
+  --color-draw: var(--c-draw);
+  --color-gold: var(--c-gold);
+  --color-roof: var(--c-roof);
+  --color-trim: var(--c-trim);
+  --color-glass: var(--c-glass);
+
+  --radius-panel: 16px;
+  --radius-control: 10px;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root {
+  color-scheme: light;
+  --c-page: #f4eee3;
+  --c-surface: #fffcf7;
+  --c-raised: #f0e8db;
+  --c-line: #e3d8c7;
+  --c-ink: #23252a;
+  --c-muted: #645d55;
+  --c-faint: #72695e;
+  /* brand = red fills behind cream text; accent = red for text, lines and focus */
+  --c-brand: #c23a2e;
+  --c-brand-hover: #a72f24;
+  --c-accent: #b8352a;
+  --c-accent-soft: #f7e2da;
+  --c-on-accent: #fff9f2;
+  --c-win: #2b7651;
+  --c-loss: #a8493f;
+  --c-draw: #75808a;
+  --c-gold: #8a6416;
+  --c-roof: #2e333a;
+  --c-trim: #fbf6ec;
+  --c-glass: #3a4852;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-page: #17181b;
+  --c-surface: #202226;
+  --c-raised: #2a2d32;
+  --c-line: #393c42;
+  --c-ink: #f2ebdf;
+  --c-muted: #b3aa9d;
+  --c-faint: #8a8278;
+  --c-brand: #c43c2f;
+  --c-brand-hover: #d24a3c;
+  --c-accent: #ef6a5a;
+  --c-accent-soft: #3b2421;
+  --c-on-accent: #fff9f2;
+  --c-win: #5bbb8c;
+  --c-loss: #dc8478;
+  --c-draw: #9aa4ac;
+  --c-gold: #d8af5a;
+  --c-roof: #101113;
+  --c-trim: #eadfcd;
+  --c-glass: #2b363e;
+}
+
+html {
+  background: var(--c-page);
+  color: var(--c-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--c-page);
+}
+
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--c-accent) 28%, transparent);
+}
+
+/* Painted brick courses, used on the red "facade" surfaces. */
+.brick {
+  background-color: var(--c-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='24'%3E%3Cpath d='M0 .5H44M0 12.5H44M.5 0V12M22.5 12V24' fill='none' stroke='%23fff' stroke-opacity='.09'/%3E%3C/svg%3E");
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--c-raised) 0%, color-mix(in oklab, var(--c-raised) 55%, var(--c-line)) 50%, var(--c-raised) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.rise { animation: rise 420ms var(--ease-out-quint) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

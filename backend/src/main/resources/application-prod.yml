@@ -1,0 +1,11 @@
+# Production (Render). Every value below that matters comes from an environment variable.
+# Required: DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD, JWT_SECRET
+# Optional: BOOTSTRAP_INVITE_CODE (remove after creating the first admin), DB_POOL_SIZE
+
+app:
+  cookies:
+    secure: true
+
+logging:
+  level:
+    no.trafonsjakk: INFO

@@ -1,0 +1,20 @@
+# Optional: pings the API so the free Render instance doesn't fall asleep during the evening.
+# Disabled by default. To enable, uncomment `schedule`, and set the repository variable
+# API_HEALTH_URL (Settings → Secrets and variables → Actions → Variables), e.g.
+# https://trafonsjakk-api.onrender.com/actuator/health
+# A single free instance running 24/7 uses ~744 of Render's 750 free hours a month.
+name: Keep API warm
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '*/14 15-23 * * *'   # every 14 min, 15:00–23:59 UTC
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: vars.API_HEALTH_URL != ''
+    steps:
+      - run: curl -fsS --max-time 90 "${{ vars.API_HEALTH_URL }}"

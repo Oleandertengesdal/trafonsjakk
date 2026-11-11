@@ -95,7 +95,7 @@ class ConcurrencyApiTest extends IntegrationTest {
             assertThat(loser.code()).as("%s", loser).isEqualTo("auth.username_taken");
         }
         // The loser's invite code was not used up
-        assertThat(jdbc.queryForObject("select count(*) from invite_codes where used_at is null and revoked_at is null", Integer.class))
+        assertThat(jdbc.queryForObject("select count(*) from invite_codes where use_count < max_uses and revoked_at is null", Integer.class))
                 .isGreaterThanOrEqualTo(ROUNDS);
     }
 
@@ -261,5 +261,23 @@ class ConcurrencyApiTest extends IntegrationTest {
             assertThat(t.path("summary").path("status").asString()).as("round %d", round).isEqualTo("COMPLETED");
             assertThat(t.path("summary").path("winner").isNull()).isFalse();
         }
+    }
+
+    @Test
+    void aCodeForThreePeopleLetsExactlyThreeInEvenWhenSixTryAtOnce() {
+        String code = admin.api().post("/api/invites", Map.of("maxUses", 3)).json().path("code").asString();
+        @SuppressWarnings("unchecked")
+        Supplier<Response>[] tries = new Supplier[6];
+        for (int i = 0; i < tries.length; i++) {
+            String name = uniqueName("rush");
+            tries[i] = () -> session().post("/api/auth/register", Map.of("username", name, "realName", "Rush",
+                    "password", PASSWORD, "inviteCode", code));
+        }
+        List<Response> rs = Race.run(tries);
+        assertThat(Race.count(rs, 201)).as("%s", rs).isEqualTo(3);
+        assertThat(rs.stream().filter(r -> r.status() != 201)).allSatisfy(r -> assertThat(r.code()).isEqualTo("invite.invalid"));
+        assertThat(jdbc.queryForObject("select use_count from invite_codes where max_uses = 3", Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("select count(*) from invite_redemptions r join invite_codes i on i.id = r.invite_id "
+                + "where i.max_uses = 3", Integer.class)).isEqualTo(3);
     }
 }

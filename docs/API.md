@@ -47,6 +47,8 @@ Page<T>     { content: T[], page, size, totalElements, totalPages }
 | POST | `/auth/refresh` | – (uses `tf_rt` cookie) | 204, rotates cookies |
 | POST | `/auth/logout` | – | 204, clears cookies, revokes refresh token |
 | GET | `/auth/me` | – | `Me` = `PlayerRef + { role, ratedGames }` |
+| POST | `/auth/password-reset/check` | `{ token }` | `{ username, realName, expiresAt }`, or 400 `reset.invalid` |
+| POST | `/auth/password-reset` | `{ token, newPassword }` | 200 `Me`, sets cookies. Uses up the link, ends all other sessions of that person, clears a login lockout. |
 
 Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName` 1–60 chars · `password` 10–72 bytes.
 
@@ -82,9 +84,11 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/invites` | Your codes (admins: everyone's), without the code itself |
-| POST | `/invites` | → `{ id, code, expiresAt }`. **The code is only shown once.** Max 5 active per member. |
-| DELETE | `/invites/{id}` | Revoke (owner or admin) |
+| GET | `/invites` | Your codes (admins: everyone's), without the code itself: `{ id, createdBy, createdAt, expiresAt, maxUses, useCount, uses: { player, usedAt }[], status }` |
+| POST | `/invites` | Optional body `{ maxUses?, validHours? }` → `{ id, code, expiresAt, maxUses }`. **The code is only shown once.** Members: one person, at most 168 hours (default), max 5 active codes. Admins: `maxUses` 1–500 and up to 2160 hours (90 days). |
+| DELETE | `/invites/{id}` | Revoke (owner or admin). People who already joined keep their accounts. |
+
+A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revoked. Simultaneous sign-ups are counted one at a time, so a code never lets in more than `maxUses` people.
 
 ## Games
 
@@ -97,6 +101,18 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 | POST | `/games/{id}/confirm` | Opponent (or either player if an admin logged it) |
 | POST | `/games/{id}/dispute` | `{ reason }` (5–500 chars) |
 | POST | `/games/{id}/withdraw` | Reporter, while `PENDING` |
+| PATCH | `/games/{id}/moves` | `{ moves }` (PGN/SAN, up to 20 000 chars; blank clears). Either player or an admin, any status except `VOIDED`. Doesn't touch ratings. |
+| GET | `/games/{id}/comments` | Oldest first: `{ id, author, body, createdAt, editedAt, canEdit, canDelete }[]` |
+| POST | `/games/{id}/comments` | `{ body }` (1–1000 chars) → 201. Not on voided games. |
+| PATCH | `/games/{id}/comments/{commentId}` | `{ body }`. Author only. |
+| DELETE | `/games/{id}/comments/{commentId}` | Author or admin → 204 |
+| GET | `/games/{id}/kudos` | `{ count, givenByMe, givers: PlayerRef[] }` |
+| PUT | `/games/{id}/kudos` | Give kudos (idempotent). Not on your own game (`kudos.own_game`), only once confirmed (`kudos.not_confirmed`). |
+| DELETE | `/games/{id}/kudos` | Take it back (idempotent) |
+
+Every game also carries `canEditMoves`, `commentCount`, `kudosCount`, `kudosGivenByMe` and `canGiveKudos`.
+
+Moves are checked for legality in the app (chess.js) before they're sent; the server stores them as text.
 
 ## Leaderboard
 
@@ -126,7 +142,8 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 | GET | `/admin/games/disputed` | |
 | POST | `/admin/games/{id}/resolve` | `{ action: "CONFIRM"|"VOID", result? }`. Works on pending, disputed and confirmed games; `result` corrects the outcome. |
 | GET | `/admin/users` | |
-| PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself. |
+| PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself. Disabling also cancels their unused invite codes and open password links. |
+| POST | `/admin/users/{id}/password-reset` | → 201 `{ token, expiresAt }`. One-time link (`/reset-password?token=…`), valid 24 h; a new link cancels the previous one. Not for yourself (`admin.cannot_change_self`) or disabled accounts (`user.disabled`). |
 | POST | `/admin/ratings/recompute` | Forces a full recompute → `{ games, players, millis }` |
 
 ## Health

@@ -17,19 +17,19 @@ public interface InviteCodeRepository extends JpaRepository<InviteCode, Long> {
     @Query("select i from InviteCode i where i.codeHash = :hash")
     Optional<InviteCode> findByCodeHashForUpdate(@Param("hash") String hash);
 
-    @Query("select i from InviteCode i left join fetch i.createdBy left join fetch i.usedBy "
+    @Query("select i from InviteCode i left join fetch i.createdBy "
             + "where i.createdBy.id = :userId order by i.createdAt desc")
     List<InviteCode> findByCreator(@Param("userId") Long userId);
 
-    @Query("select i from InviteCode i left join fetch i.createdBy left join fetch i.usedBy order by i.createdAt desc")
+    @Query("select i from InviteCode i left join fetch i.createdBy order by i.createdAt desc")
     List<InviteCode> findAllWithUsers();
 
-    @Query("select count(i) from InviteCode i where i.createdBy.id = :userId and i.usedAt is null "
+    @Query("select count(i) from InviteCode i where i.createdBy.id = :userId and i.useCount < i.maxUses "
             + "and i.revokedAt is null and i.expiresAt > :now")
     long countActiveByCreator(@Param("userId") Long userId, @Param("now") Instant now);
 
     @Modifying
-    @Query("update InviteCode i set i.revokedAt = :now where i.createdBy.id = :userId and i.usedAt is null "
-            + "and i.revokedAt is null and i.expiresAt > :now")
+    @Query("update InviteCode i set i.revokedAt = :now where i.createdBy.id = :userId "
+            + "and i.useCount < i.maxUses and i.revokedAt is null and i.expiresAt > :now")
     int revokeActiveByCreator(@Param("userId") Long userId, @Param("now") Instant now);
 }

@@ -45,7 +45,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
-                                "/api/auth/refresh", "/api/auth/logout").permitAll()
+                                "/api/auth/refresh", "/api/auth/logout",
+                                "/api/auth/password-reset", "/api/auth/password-reset/check").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())

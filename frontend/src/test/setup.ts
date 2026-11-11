@@ -13,6 +13,15 @@ if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.sho
   }
 }
 
+// jsdom has no layout; the chess board only needs the observer to exist.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+}
+
 export function clearCookies() {
   for (const c of document.cookie.split('; ')) {
     const name = c.split('=')[0]

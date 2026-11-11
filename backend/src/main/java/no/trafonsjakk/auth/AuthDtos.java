@@ -23,4 +23,12 @@ public final class AuthDtos {
             @NotNull @Size(min = 10, max = 72, message = "must be 10–72 characters") String password,
             @NotBlank @Size(max = 100) String inviteCode) {
     }
+
+    public record ResetCheckRequest(@NotBlank @Size(max = 200) String token) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank @Size(max = 200) String token,
+            @NotNull @Size(min = 10, max = 72, message = "must be 10–72 characters") String newPassword) {
+    }
 }

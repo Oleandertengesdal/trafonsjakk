@@ -1,10 +1,13 @@
 import { api, json } from './client'
 import type {
   AdminUser,
+  CreatedInvite,
   Game,
+  GameComment,
   GameResult,
   GameStatus,
   Invite,
+  Kudos,
   LeaderboardRow,
   Me,
   MyMatch,
@@ -26,6 +29,13 @@ export const authApi = {
   register: (body: { username: string; realName: string; password: string; inviteCode: string }) =>
     api<Me>('/api/auth/register', { method: 'POST', body: json(body) }),
   logout: () => api<void>('/api/auth/logout', { method: 'POST' }),
+  checkReset: (token: string) =>
+    api<{ username: string; realName: string; expiresAt: string }>('/api/auth/password-reset/check', {
+      method: 'POST',
+      body: json({ token }),
+    }),
+  resetPassword: (token: string, newPassword: string) =>
+    api<Me>('/api/auth/password-reset', { method: 'POST', body: json({ token, newPassword }) }),
 }
 
 export const usersApi = {
@@ -65,6 +75,21 @@ export const gamesApi = {
   dispute: (id: number, reason: string) =>
     api<Game>(`/api/games/${id}/dispute`, { method: 'POST', body: json({ reason }) }),
   withdraw: (id: number) => api<Game>(`/api/games/${id}/withdraw`, { method: 'POST' }),
+  updateMoves: (id: number, moves: string | null) =>
+    api<Game>(`/api/games/${id}/moves`, { method: 'PATCH', body: json({ moves }) }),
+}
+
+export const socialApi = {
+  comments: (gameId: number) => api<GameComment[]>(`/api/games/${gameId}/comments`),
+  addComment: (gameId: number, body: string) =>
+    api<GameComment>(`/api/games/${gameId}/comments`, { method: 'POST', body: json({ body }) }),
+  editComment: (gameId: number, id: number, body: string) =>
+    api<GameComment>(`/api/games/${gameId}/comments/${id}`, { method: 'PATCH', body: json({ body }) }),
+  deleteComment: (gameId: number, id: number) =>
+    api<void>(`/api/games/${gameId}/comments/${id}`, { method: 'DELETE' }),
+  kudos: (gameId: number) => api<Kudos>(`/api/games/${gameId}/kudos`),
+  giveKudos: (gameId: number) => api<Kudos>(`/api/games/${gameId}/kudos`, { method: 'PUT' }),
+  takeKudos: (gameId: number) => api<Kudos>(`/api/games/${gameId}/kudos`, { method: 'DELETE' }),
 }
 
 export const leaderboardApi = {
@@ -85,7 +110,9 @@ export const tournamentsApi = {
 
 export const invitesApi = {
   list: () => api<Invite[]>('/api/invites'),
-  create: () => api<{ id: number; code: string; expiresAt: string }>('/api/invites', { method: 'POST' }),
+  /** Both optional. Several people (maxUses > 1) is admin-only. */
+  create: (opts: { maxUses?: number; validHours?: number } = {}) =>
+    api<CreatedInvite>('/api/invites', { method: 'POST', body: json(opts) }),
   revoke: (id: number) => api<void>(`/api/invites/${id}`, { method: 'DELETE' }),
 }
 
@@ -96,6 +123,8 @@ export const adminApi = {
   users: () => api<AdminUser[]>('/api/admin/users'),
   updateUser: (id: number, body: { role?: Role; enabled?: boolean }) =>
     api<AdminUser>(`/api/admin/users/${id}`, { method: 'PATCH', body: json(body) }),
+  passwordReset: (userId: number) =>
+    api<{ token: string; expiresAt: string }>(`/api/admin/users/${userId}/password-reset`, { method: 'POST' }),
   recompute: () =>
     api<{ games: number; players: number; millis: number }>('/api/admin/ratings/recompute', { method: 'POST' }),
 }

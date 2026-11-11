@@ -63,6 +63,15 @@ public final class GameDtos {
             RatingChange ratingChange,
             boolean canConfirm,
             boolean canDispute,
-            boolean canWithdraw) {
+            boolean canWithdraw,
+            boolean canEditMoves,
+            int commentCount,
+            int kudosCount,
+            boolean kudosGivenByMe,
+            boolean canGiveKudos) {
+    }
+
+    /** Moves in PGN/SAN ("1. e4 e5 2. Nf3 …"), checked for legality in the app. Blank clears them. */
+    public record MovesRequest(@Size(max = 20000) @PlainText String moves) {
     }
 }

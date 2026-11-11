@@ -2,6 +2,7 @@ package no.trafonsjakk.admin;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import no.trafonsjakk.auth.PasswordResetService;
 import no.trafonsjakk.common.CurrentUser;
 import no.trafonsjakk.game.GameDtos.GameDto;
 import no.trafonsjakk.game.GameDtos.ResolveRequest;
@@ -10,6 +11,7 @@ import no.trafonsjakk.rating.RatingService;
 import no.trafonsjakk.user.UserDtos.AdminUpdateUserRequest;
 import no.trafonsjakk.user.UserDtos.AdminUser;
 import no.trafonsjakk.user.UserService;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Admin-only endpoints. Access is enforced by SecurityConfig ({@code /api/admin/**} → ROLE_ADMIN). */
@@ -28,8 +31,10 @@ public class AdminController {
     private final GameService games;
     private final UserService users;
     private final RatingService ratings;
+    private final PasswordResetService resets;
 
-    public AdminController(GameService games, UserService users, RatingService ratings) {
+    public AdminController(GameService games, UserService users, RatingService ratings, PasswordResetService resets) {
+        this.resets = resets;
         this.games = games;
         this.users = users;
         this.ratings = ratings;
@@ -54,6 +59,13 @@ public class AdminController {
     AdminUser updateUser(@PathVariable long id, @RequestBody AdminUpdateUserRequest req,
                          @AuthenticationPrincipal Jwt jwt) {
         return users.adminUpdate(id, req, CurrentUser.of(jwt));
+    }
+
+    /** A one-time link (24 h) for someone who forgot their password. Send it to them; they pick a new one. */
+    @PostMapping("/users/{id}/password-reset")
+    @ResponseStatus(HttpStatus.CREATED)
+    PasswordResetService.CreatedReset passwordReset(@PathVariable long id, @AuthenticationPrincipal Jwt jwt) {
+        return resets.create(id, CurrentUser.of(jwt));
     }
 
     @PostMapping("/ratings/recompute")

@@ -8,14 +8,17 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 
 ## Features
 
-- **Log a physical game** in seconds: opponent, colour, result, when. Opening, notes and moves are optional.
+- **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
+- **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
+- **Comments and kudos** on every game.
 - **Opponent confirmation.** A result counts once the other player confirms it, or automatically after 48 hours. Disputes go to an admin.
 - **Glicko-2 ratings**, updated after every confirmed game, with a rating deviation (±) and provisional "?" for new players. Ratings are always rebuilt from the game history, so late, corrected or voided results never leave them wrong.
 - **Tournaments**
   - *Round-robin* (single or double): Berger pairings with balanced colours, and a live crosstable with Sonneborn–Berger tie-breaks.
   - *Knockout*: seeded bracket with byes for top seeds. Winners advance automatically; draws are replayed with colours reversed.
 - **Player statistics:** rating graph, W/D/L, white vs black, streaks, head-to-head against every friend, nemesis, best win, favourite opening, activity.
-- **Invite-only sign-up** with single-use codes, plus admin tools for disputes and members.
+- **Invite-only sign-up.** Members make single-use codes; admins can make one code for a whole group, with their own limit and expiry.
+- **Admin tools** for disputes and members, including a one-time link for someone who forgot their password.
 - **Norsk og engelsk:** Norwegian (bokmål) by default with English one tap away. Dates, numbers and even server error messages follow the chosen language.
 - A warm **light theme inspired by the Trafon building** (red facade, cream trim, arched windows) with a tuned dark mode. Fully responsive, with a mobile tab bar and a big red "Log game" button.
 
@@ -77,3 +80,8 @@ backend/     Spring Boot API (feature packages: auth, game, rating, tournament, 
 frontend/    React SPA (api client, design-system components, pages)
 docs/        Architecture, API, security, development and deployment guides
 ```
+
+## Credits
+
+- Move legality: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause). Board: [react-chessboard](https://github.com/Clariity/react-chessboard) (MIT).
+- Chess piece graphics by Colin M.L. Burnett, used under the BSD license (via react-chessboard).

@@ -16,6 +16,7 @@ import { LogGamePage } from './pages/LogGamePage'
 import { LoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { TournamentsPage } from './pages/TournamentsPage'
 
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })))
@@ -40,6 +41,7 @@ export function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 {/* Public on purpose: people who can't log in can report that too */}
                 <Route path="/feedback" element={<FeedbackPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route
                   element={
                     <RequireAuth>

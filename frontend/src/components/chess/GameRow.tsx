@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { MessageCircle, ThumbsUp } from 'lucide-react'
 import type { Game } from '../../api/types'
 import { useI18n } from '../../i18n/I18nProvider'
 import { cn } from '../../lib/cn'
@@ -24,7 +25,25 @@ export function GameRow({ game }: { game: Game }) {
       >
         <span className="hidden text-sm text-muted sm:block">{f.shortDate(game.playedAt)}</span>
         <Side name={game.white.realName} seed={game.white.username} delta={rc?.white} winner={game.result === 'WHITE_WIN'} align="end" colourLabel={t.common.white} light />
-        <ResultMark result={game.result} className={cn('w-12 text-center text-lg', game.status === 'VOIDED' && 'text-faint line-through')} />
+        <span className="flex flex-col items-center">
+          <ResultMark result={game.result} className={cn('w-12 text-center text-lg', game.status === 'VOIDED' && 'text-faint line-through')} />
+          {(game.kudosCount > 0 || game.commentCount > 0) && (
+            <span className="flex items-center gap-2 text-[0.75rem] text-muted tabular-nums">
+              {game.kudosCount > 0 && (
+                <span className="inline-flex items-center gap-0.5" aria-label={t.social.kudosCount(game.kudosCount)}>
+                  <ThumbsUp aria-hidden className="size-3" />
+                  {game.kudosCount}
+                </span>
+              )}
+              {game.commentCount > 0 && (
+                <span className="inline-flex items-center gap-0.5" aria-label={t.social.commentCount(game.commentCount)}>
+                  <MessageCircle aria-hidden className="size-3" />
+                  {game.commentCount}
+                </span>
+              )}
+            </span>
+          )}
+        </span>
         <Side name={game.black.realName} seed={game.black.username} delta={rc?.black} winner={game.result === 'BLACK_WIN'} align="start" colourLabel={t.common.black} />
         <span className={cn('hidden text-right text-[0.8125rem] sm:block', statusTone[game.status])}>
           {game.status === 'CONFIRMED' ? (game.tournament?.name ?? '') : t.gameStatus[game.status]}

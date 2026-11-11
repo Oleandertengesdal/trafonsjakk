@@ -16,6 +16,7 @@ import { SkeletonRows } from '../components/ui/Skeleton'
 import { useToast } from '../components/ui/Toast'
 import { useI18n } from '../i18n/I18nProvider'
 import { useErrorText } from '../i18n/useErrorText'
+import { ResetLinkButton } from '../components/admin/ResetLinkButton'
 
 export function AdminPage() {
   const { me } = useAuth()
@@ -116,6 +117,7 @@ export function AdminPage() {
                               <Button size="sm" variant="ghost" disabled={pending} onClick={() => updateUser.mutate({ id: u.id, body: { role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' } })}>
                                 {u.role === 'ADMIN' ? a.removeAdmin : a.makeAdmin}
                               </Button>
+                              {u.enabled && <ResetLinkButton user={u} />}
                               <Button size="sm" variant={u.enabled ? 'danger' : 'secondary'} disabled={pending} onClick={() => updateUser.mutate({ id: u.id, body: { enabled: !u.enabled } })}>
                                 {u.enabled ? a.disable : a.enable}
                               </Button>

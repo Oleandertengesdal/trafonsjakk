@@ -35,6 +35,11 @@ export function pendingGame(overrides: Partial<Game> = {}): Game {
     canConfirm: false,
     canDispute: false,
     canWithdraw: false,
+    canEditMoves: false,
+    commentCount: 0,
+    kudosCount: 0,
+    kudosGivenByMe: false,
+    canGiveKudos: false,
     ...overrides,
   }
 }

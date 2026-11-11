@@ -12,7 +12,10 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import no.trafonsjakk.user.User;
 
-/** Single-use registration code, stored as a SHA-256 hash of its normalized form. */
+/**
+ * Registration code, stored as a SHA-256 hash of its normalized form. Usually for one person; an admin
+ * can make one for several ({@code maxUses}). Who used it is in {@link InviteRedemption}.
+ */
 @Entity
 @Table(name = "invite_codes")
 public class InviteCode {
@@ -36,12 +39,11 @@ public class InviteCode {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "used_by")
-    private User usedBy;
+    @Column(name = "max_uses", nullable = false)
+    private int maxUses = 1;
 
-    @Column(name = "used_at")
-    private Instant usedAt;
+    @Column(name = "use_count", nullable = false)
+    private int useCount;
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
@@ -49,18 +51,19 @@ public class InviteCode {
     protected InviteCode() {
     }
 
-    public InviteCode(String codeHash, User createdBy, Instant createdAt, Instant expiresAt) {
+    public InviteCode(String codeHash, User createdBy, Instant createdAt, Instant expiresAt, int maxUses) {
         this.codeHash = codeHash;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
+        this.maxUses = maxUses;
     }
 
     public Status status(Instant now) {
         if (revokedAt != null) {
             return Status.REVOKED;
         }
-        if (usedAt != null) {
+        if (useCount >= maxUses) {
             return Status.USED;
         }
         if (expiresAt.isBefore(now)) {
@@ -69,9 +72,12 @@ public class InviteCode {
         return Status.ACTIVE;
     }
 
-    public void markUsed(User user, Instant at) {
-        this.usedBy = user;
-        this.usedAt = at;
+    /** Counts one sign-up. Call only on an ACTIVE code that is row-locked. */
+    public void recordUse() {
+        if (useCount >= maxUses) {
+            throw new IllegalStateException("Invite code is used up");
+        }
+        useCount++;
     }
 
     public void revoke(Instant at) {
@@ -94,12 +100,12 @@ public class InviteCode {
         return expiresAt;
     }
 
-    public User getUsedBy() {
-        return usedBy;
+    public int getMaxUses() {
+        return maxUses;
     }
 
-    public Instant getUsedAt() {
-        return usedAt;
+    public int getUseCount() {
+        return useCount;
     }
 
     public Instant getRevokedAt() {

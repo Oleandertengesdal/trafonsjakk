@@ -16,10 +16,10 @@ function leaves(a: unknown, b: unknown, path = ''): Leaf[] {
 const all = leaves(en, nb)
 
 // Text that is legitimately the same in both languages
-// (proper names, the ECO code system, and words Norwegian uses as-is: admin, rating, score, form, format)
+// (proper names, the ECO code system, and words Norwegian uses as-is: admin, rating, score, form, format, kudos)
 const SAME_IN_BOTH = new Set([
   'appName', 'language.nb', 'language.en', 'logGame.eco', 'common.admin', 'nav.admin', 'gameDetail.adminTitle', 'admin.title',
-  'leaderboard.rating', 'leaderboard.score', 'profile.score', 'profile.form', 'tournamentNew.format',
+  'leaderboard.rating', 'leaderboard.score', 'profile.score', 'profile.form', 'tournamentNew.format', 'social.kudos',
 ])
 
 describe('dictionaries', () => {

@@ -27,8 +27,11 @@ public class AuthController {
     private final TokenService tokens;
     private final AuthCookies cookies;
     private final UserRepository users;
+    private final PasswordResetService resets;
 
-    public AuthController(AuthService auth, TokenService tokens, AuthCookies cookies, UserRepository users) {
+    public AuthController(AuthService auth, TokenService tokens, AuthCookies cookies, UserRepository users,
+                          PasswordResetService resets) {
+        this.resets = resets;
         this.auth = auth;
         this.tokens = tokens;
         this.cookies = cookies;
@@ -54,6 +57,18 @@ public class AuthController {
     Me register(@Valid @RequestBody AuthDtos.RegisterRequest req, HttpServletRequest request,
                 HttpServletResponse response) {
         TokenService.IssuedTokens issued = auth.register(req, request.getRemoteAddr());
+        cookies.write(response, issued);
+        return Me.of(issued.user());
+    }
+
+    @PostMapping("/password-reset/check")
+    PasswordResetService.ResetTarget checkReset(@Valid @RequestBody AuthDtos.ResetCheckRequest req) {
+        return resets.check(req.token());
+    }
+
+    @PostMapping("/password-reset")
+    Me resetPassword(@Valid @RequestBody AuthDtos.ResetPasswordRequest req, HttpServletResponse response) {
+        TokenService.IssuedTokens issued = resets.reset(req.token(), req.newPassword());
         cookies.write(response, issued);
         return Me.of(issued.user());
     }

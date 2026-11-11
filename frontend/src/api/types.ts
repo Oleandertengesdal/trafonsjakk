@@ -56,6 +56,27 @@ export interface Game {
   canConfirm: boolean
   canDispute: boolean
   canWithdraw: boolean
+  canEditMoves: boolean
+  commentCount: number
+  kudosCount: number
+  kudosGivenByMe: boolean
+  canGiveKudos: boolean
+}
+
+export interface GameComment {
+  id: number
+  author: PlayerRef
+  body: string
+  createdAt: string
+  editedAt: string | null
+  canEdit: boolean
+  canDelete: boolean
+}
+
+export interface Kudos {
+  count: number
+  givenByMe: boolean
+  givers: PlayerRef[]
 }
 
 export interface Page<T> {
@@ -191,9 +212,17 @@ export interface Invite {
   createdBy: PlayerRef | null
   createdAt: string
   expiresAt: string
-  usedBy: PlayerRef | null
-  usedAt: string | null
+  maxUses: number
+  useCount: number
+  uses: { player: PlayerRef; usedAt: string }[]
   status: 'ACTIVE' | 'USED' | 'EXPIRED' | 'REVOKED'
+}
+
+export interface CreatedInvite {
+  id: number
+  code: string
+  expiresAt: string
+  maxUses: number
 }
 
 export interface AdminUser {

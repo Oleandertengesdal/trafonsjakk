@@ -7,8 +7,11 @@ export function Segmented<T extends string>({
   value,
   onChange,
   options,
+  hideLabel,
 }: {
   label: string
+  /** Keep the label for screen readers only (when a heading right above already says it). */
+  hideLabel?: boolean
   value: T
   onChange: (v: T) => void
   options: { value: T; label: ReactNode; hint?: string }[]
@@ -16,7 +19,7 @@ export function Segmented<T extends string>({
   const name = useId()
   return (
     <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-sm font-medium">{label}</legend>
+      <legend className={cn('mb-1.5 text-sm font-medium', hideLabel && 'sr-only')}>{label}</legend>
       <div className="grid auto-cols-fr grid-flow-col gap-1 rounded-control border border-line bg-surface p-1">
         {options.map((o) => (
           <label

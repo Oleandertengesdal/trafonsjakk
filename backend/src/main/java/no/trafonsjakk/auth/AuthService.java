@@ -88,7 +88,7 @@ public class AuthService {
             throw ApiException.conflict("auth.username_taken", "That username is taken");
         }
         if (invite != null) {
-            invite.markUsed(user, Instant.now());
+            invites.recordUse(invite, user);
         }
         return tokens.issue(user);
     }

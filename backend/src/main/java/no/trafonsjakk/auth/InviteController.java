@@ -1,5 +1,6 @@
 package no.trafonsjakk.auth;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import no.trafonsjakk.common.CurrentUser;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,8 +32,9 @@ public class InviteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    InviteService.CreatedInvite create(@AuthenticationPrincipal Jwt jwt) {
-        return invites.create(CurrentUser.of(jwt));
+    InviteService.CreatedInvite create(@AuthenticationPrincipal Jwt jwt,
+                                       @Valid @RequestBody(required = false) InviteService.CreateInviteRequest req) {
+        return invites.create(CurrentUser.of(jwt), req);
     }
 
     @DeleteMapping("/{id}")

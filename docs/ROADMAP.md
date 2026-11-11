@@ -73,8 +73,8 @@ These were agreed before any code was written.
 | Part | Verified |
 |---|---|
 | Domain logic (Glicko-2, round-robin, knockout, standings, stats) | ✅ Unit tests. Glicko-2 matches Glickman's published example (1464.06 / 151.52 / 0.05999). Round-robin colours are checked for every field size up to 32: balanced, never three in a row, also across the two halves of a double round-robin. |
-| Spring wiring, security, database | ✅ 246 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency). |
-| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 151 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian). A 57-step browser test against a mock API also passed in both languages. |
+| Spring wiring, security, database | ✅ 275 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency); multi-use invite codes (including six people racing for three places), password reset links, comments, kudos and adding moves. |
+| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 216 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian), the move recorder (tap moves, illegal taps, promotion, undo, typed/pasted PGN with the first illegal move pointed out, checkmate vs. result), comments, kudos, invites and the password reset page. A 57-step browser test against a mock API also passed in both languages. |
 
 ### Bugs found by the tests (fixed)
 
@@ -98,11 +98,19 @@ Second round (security, races, limits):
 - An empty ECO code was rejected although the API treats it as "none".
 - **Frontend:** a sleeping server (free hosting) sent logged-in users to the login page; logging out while offline left an unhandled error; the login page could dead-end on a malformed return address.
 
+## Added after launch (from members' feedback)
+
+- Invite codes for several people (admin): own limit (1–500) and expiry (1 hour to 90 days).
+- One-time password links an admin sends to someone who forgot their password.
+- Comments and kudos on games.
+- Recording moves on a board or as text/PGN, checked for legality; moves can be added after the game is logged.
+- A "Found a problem?" page for reporting bugs by email.
+
 ## Later ideas
 
+- **Replay and analysis on the board:** step through a game's moves (the stored moves are already validated PGN, and the board component is in place), then perhaps an engine evaluation
 - Nynorsk as a third language
 - Swiss-system tournaments
-- PGN import with a board viewer for the `moves` field
 - Push/e-mail notification when a game awaits your confirmation
 - Separate rating pools per time control (blitz/rapid/classical)
 - Season resets / yearly leaderboards

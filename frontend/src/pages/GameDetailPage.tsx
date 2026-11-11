@@ -8,6 +8,9 @@ import { useAuth } from '../auth/AuthProvider'
 import { AdminResolveControls } from '../components/chess/AdminResolveControls'
 import { Avatar } from '../components/chess/Avatar'
 import { GameActions } from '../components/chess/GameActions'
+import { GameComments } from '../components/chess/GameComments'
+import { GameMoves } from '../components/chess/GameMoves'
+import { KudosButton } from '../components/chess/KudosButton'
 import { RatingDelta, ResultMark } from '../components/chess/ResultMark'
 import { ErrorNotice } from '../components/ui/ErrorNotice'
 import { Panel } from '../components/ui/Panel'
@@ -50,6 +53,9 @@ export function GameDetailPage() {
           <PlayerSide player={g.black} colour={t.common.black} delta={g.ratingChange?.black} won={g.result === 'BLACK_WIN'} />
         </div>
         <p className="mt-6 text-center text-[0.9375rem] text-muted">{f.dateTime(g.playedAt)}</p>
+        <div className="mt-5 flex justify-center">
+          <KudosButton game={g} />
+        </div>
       </section>
 
       {(g.canConfirm || g.canWithdraw) && (
@@ -98,12 +104,17 @@ export function GameDetailPage() {
               <span className="whitespace-pre-wrap">{g.notes}</span>
             </Detail>
           )}
-          {g.moves && (
-            <Detail label={d.moves} wide>
-              <span className="block max-h-64 overflow-auto rounded-control bg-page px-3 py-2.5 text-[0.875rem] leading-relaxed whitespace-pre-wrap">{g.moves}</span>
-            </Detail>
-          )}
         </dl>
+      </Panel>
+
+      {(g.moves || g.canEditMoves) && (
+        <Panel title={t.moves.title}>
+          <GameMoves key={`${g.id}-${g.moves ?? ''}`} game={g} />
+        </Panel>
+      )}
+
+      <Panel title={g.commentCount > 0 ? `${t.social.comments} (${g.commentCount})` : t.social.comments} id="comments">
+        <GameComments game={g} />
       </Panel>
     </div>
   )

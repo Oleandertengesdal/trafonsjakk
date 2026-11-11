@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import no.trafonsjakk.auth.InviteCodeRepository;
+import no.trafonsjakk.auth.PasswordResetTokenRepository;
 import no.trafonsjakk.auth.TokenService;
 import no.trafonsjakk.common.ApiException;
 import no.trafonsjakk.common.CurrentUser;
@@ -21,9 +22,11 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokens;
     private final InviteCodeRepository invites;
+    private final PasswordResetTokenRepository resets;
 
     public UserService(UserRepository users, PasswordEncoder passwordEncoder, TokenService tokens,
-                       InviteCodeRepository invites) {
+                       InviteCodeRepository invites, PasswordResetTokenRepository resets) {
+        this.resets = resets;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
@@ -78,6 +81,7 @@ public class UserService {
                 // and their unused invite codes stop working.
                 tokens.revokeAllForUser(u.getId());
                 invites.revokeActiveByCreator(u.getId(), Instant.now());
+                resets.revokeOpenForUser(u.getId(), Instant.now());
             }
         }
         return AdminUser.of(u);

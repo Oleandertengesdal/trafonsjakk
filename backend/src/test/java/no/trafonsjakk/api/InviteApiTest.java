@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import no.trafonsjakk.support.ApiSession.Response;
 import no.trafonsjakk.support.IntegrationTest;
@@ -80,8 +81,11 @@ class InviteApiTest extends IntegrationTest {
         for (JsonNode i : all) {
             if (i.path("status").asString().equals("USED")) {
                 used++;
-                assertThat(i.path("usedBy").path("username").asString()).isIn(alice.username(), bob.username());
-                assertThat(i.path("usedAt").isNull()).isFalse();
+                assertThat(i.path("uses")).hasSize(1);
+                assertThat(i.path("uses").get(0).path("player").path("username").asString()).isIn(alice.username(), bob.username());
+                assertThat(i.path("uses").get(0).path("usedAt").isNull()).isFalse();
+                assertThat(i.path("useCount").asInt()).isEqualTo(1);
+                assertThat(i.path("maxUses").asInt()).isEqualTo(1);
             }
         }
         assertThat(used).isEqualTo(2);
@@ -125,5 +129,111 @@ class InviteApiTest extends IntegrationTest {
                 "password", PASSWORD, "inviteCode", BOOTSTRAP_CODE));
         assertThat(r.status()).isEqualTo(400);
         assertThat(r.code()).isEqualTo("invite.invalid");
+    }
+
+    // ---- codes for several people (admin only) ------------------------------------------------
+
+    private Response signUp(String code, String name) {
+        return session().post("/api/auth/register", Map.of("username", uniqueName(name), "realName", name,
+                "password", PASSWORD, "inviteCode", code));
+    }
+
+    @Test
+    void anAdminCodeCanSignUpSeveralPeopleUpToItsLimit() {
+        Response created = admin.api().post("/api/invites", Map.of("maxUses", 3, "validHours", 48));
+        assertThat(created.status()).as("%s", created).isEqualTo(201);
+        assertThat(created.json().path("maxUses").asInt()).isEqualTo(3);
+        Instant expires = Instant.parse(created.json().path("expiresAt").asString());
+        assertThat(expires).isBetween(Instant.now().plus(47, ChronoUnit.HOURS), Instant.now().plus(49, ChronoUnit.HOURS));
+        String code = created.json().path("code").asString();
+
+        for (String n : List.of("one", "two", "three")) {
+            assertThat(signUp(code, n).status()).isEqualTo(201);
+        }
+        Response fourth = signUp(code, "four");
+        assertThat(fourth.code()).isEqualTo("invite.invalid");
+
+        JsonNode view = admin.api().get("/api/invites").json();
+        JsonNode invite = null;
+        for (JsonNode i : view) {
+            if (i.path("id").asLong() == created.json().path("id").asLong()) {
+                invite = i;
+            }
+        }
+        assertThat(invite).isNotNull();
+        assertThat(invite.path("status").asString()).isEqualTo("USED");
+        assertThat(invite.path("useCount").asInt()).isEqualTo(3);
+        assertThat(invite.path("uses")).hasSize(3);
+        assertThat(invite.path("uses").get(0).path("player").path("realName").asString()).isEqualTo("one");
+    }
+
+    @Test
+    void aPartlyUsedCodeStaysActiveAndCanBeRevoked() {
+        JsonNode created = admin.api().post("/api/invites", Map.of("maxUses", 5)).json();
+        String code = created.path("code").asString();
+        signUp(code, "early");
+        JsonNode listed = admin.api().get("/api/invites").json().get(0);
+        assertThat(listed.path("status").asString()).isEqualTo("ACTIVE");
+        assertThat(listed.path("useCount").asInt()).isEqualTo(1);
+        assertThat(Instant.parse(listed.path("expiresAt").asString()))
+                .as("default lifetime is a week").isAfter(Instant.now().plus(6, ChronoUnit.DAYS));
+
+        assertThat(admin.api().delete("/api/invites/" + created.path("id").asLong()).status()).isEqualTo(204);
+        assertThat(signUp(code, "late").code()).isEqualTo("invite.invalid");
+        assertThat(admin.api().get("/api/invites").json().get(0).path("uses")).as("who already joined stays listed").hasSize(1);
+    }
+
+    @Test
+    void anExpiredMultiUseCodeStopsWorking() {
+        JsonNode created = admin.api().post("/api/invites", Map.of("maxUses", 10, "validHours", 1)).json();
+        jdbc.update("update invite_codes set expires_at = ? where id = ?",
+                Timestamp.from(Instant.now().minusSeconds(1)), created.path("id").asLong());
+        assertThat(signUp(created.path("code").asString(), "late").code()).isEqualTo("invite.invalid");
+        assertThat(admin.api().get("/api/invites").json().get(0).path("status").asString()).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void membersCanOnlyMakeSinglePersonCodesForAtMostAWeek() {
+        Response multi = alice.api().post("/api/invites", Map.of("maxUses", 2));
+        assertThat(multi.status()).isEqualTo(403);
+        assertThat(multi.code()).isEqualTo("invite.multi_use_admin_only");
+        assertThat(alice.api().post("/api/invites", Map.of("maxUses", 1)).status()).isEqualTo(201);
+
+        Response long1 = alice.api().post("/api/invites", Map.of("validHours", 169));
+        assertThat(long1.status()).isEqualTo(400);
+        assertThat(long1.code()).isEqualTo("invite.too_long");
+        assertThat(long1.json().path("params").path("maxHours").asInt()).isEqualTo(168);
+        JsonNode shortOne = alice.api().post("/api/invites", Map.of("validHours", 2)).json();
+        assertThat(Instant.parse(shortOne.path("expiresAt").asString())).isBefore(Instant.now().plus(3, ChronoUnit.HOURS));
+        // No body at all still works (the old app sends none)
+        assertThat(alice.api().post("/api/invites").status()).isEqualTo(201);
+    }
+
+    @Test
+    void adminLimitsAreValidated() {
+        Response zero = admin.api().post("/api/invites", Map.of("maxUses", 0));
+        assertThat(zero.code()).isEqualTo("validation");
+        assertThat(zero.json().path("errorCodes").path("maxUses").asString()).isEqualTo("Min");
+        assertThat(admin.api().post("/api/invites", Map.of("maxUses", 501)).json().path("errorCodes").path("maxUses").asString())
+                .isEqualTo("Max");
+        assertThat(admin.api().post("/api/invites", Map.of("validHours", 0)).json().path("errorCodes").path("validHours").asString())
+                .isEqualTo("Min");
+        Response tooLong = admin.api().post("/api/invites", Map.of("validHours", 2161));
+        assertThat(tooLong.code()).isEqualTo("invite.too_long");
+        assertThat(tooLong.json().path("params").path("maxHours").asInt()).isEqualTo(2160);
+        assertThat(admin.api().post("/api/invites", Map.of("maxUses", 500, "validHours", 2160)).status()).isEqualTo(201);
+    }
+
+    @Test
+    void aMultiUseCodeDoesNotCountAgainstTheMemberLimitOnceFull() {
+        // Members' limit counts active codes; a used-up code frees the slot
+        for (int i = 0; i < 5; i++) {
+            String code = alice.api().post("/api/invites").json().path("code").asString();
+            if (i == 0) {
+                assertThat(signUp(code, "friend").status()).isEqualTo(201);
+            }
+        }
+        assertThat(alice.api().post("/api/invites").status()).isEqualTo(201);
+        assertThat(alice.api().post("/api/invites").code()).isEqualTo("invite.limit");
     }
 }

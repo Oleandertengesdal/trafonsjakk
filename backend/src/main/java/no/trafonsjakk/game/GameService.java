@@ -240,6 +240,20 @@ public class GameService {
         return mapper.toDto(load(id), actor);
     }
 
+    /** Adds, changes or clears the moves of a game. Either player or an admin; doesn't affect ratings. */
+    @Transactional
+    public GameDto updateMoves(long id, String moves, CurrentUser actor) {
+        Game game = load(id);
+        if (game.getStatus() == GameStatus.VOIDED) {
+            throw ApiException.conflict("game.voided", "This game has been voided");
+        }
+        if (!game.involves(actor.id()) && !actor.admin()) {
+            throw ApiException.forbidden("game.not_a_player", "Only the players (or an admin) can add the moves");
+        }
+        game.setMoves(moves == null || moves.isBlank() ? null : moves.trim());
+        return mapper.toDto(game, actor);
+    }
+
     private Game load(long id) {
         return games.findById(id).orElseThrow(() -> ApiException.notFound("game.not_found", "Game not found"));
     }

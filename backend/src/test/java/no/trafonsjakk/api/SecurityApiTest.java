@@ -206,6 +206,10 @@ class SecurityApiTest extends IntegrationTest {
                 new Call("GET", "/api/games"), new Call("GET", "/api/games/pending"), new Call("GET", "/api/games/1"),
                 new Call("POST", "/api/games"), new Call("POST", "/api/games/1/confirm"),
                 new Call("POST", "/api/games/1/dispute"), new Call("POST", "/api/games/1/withdraw"),
+                new Call("PATCH", "/api/games/1/moves"), new Call("GET", "/api/games/1/comments"),
+                new Call("POST", "/api/games/1/comments"), new Call("PATCH", "/api/games/1/comments/1"),
+                new Call("DELETE", "/api/games/1/comments/1"), new Call("GET", "/api/games/1/kudos"),
+                new Call("PUT", "/api/games/1/kudos"), new Call("DELETE", "/api/games/1/kudos"),
                 new Call("GET", "/api/leaderboard"), new Call("GET", "/api/tournaments"),
                 new Call("POST", "/api/tournaments"), new Call("GET", "/api/tournaments/matches/mine"),
                 new Call("GET", "/api/tournaments/1"), new Call("PUT", "/api/tournaments/1/participants"),
@@ -216,6 +220,7 @@ class SecurityApiTest extends IntegrationTest {
     private static List<Call> adminEndpoints() {
         return List.of(new Call("GET", "/api/admin/games/disputed"), new Call("POST", "/api/admin/games/1/resolve"),
                 new Call("GET", "/api/admin/users"), new Call("PATCH", "/api/admin/users/1"),
+                new Call("POST", "/api/admin/users/1/password-reset"),
                 new Call("POST", "/api/admin/ratings/recompute"));
     }
 

@@ -1,7 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowLeftRight, Trophy } from 'lucide-react'
+import { ArrowLeftRight, ListOrdered, Trophy } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { gamesApi, tournamentsApi, usersApi } from '../api/endpoints'
 import { invalidateResults } from '../api/queryClient'
@@ -21,6 +21,9 @@ import { roundName } from '../i18n/rounds'
 import { useErrorText, useFieldErrors } from '../i18n/useErrorText'
 import { cn } from '../lib/cn'
 import { toResult, type Outcome } from '../lib/gameResult'
+
+// The board and chess.js load only if someone records the moves
+const MoveRecorder = lazy(() => import('../components/chess/MoveRecorder'))
 
 type Colour = 'WHITE' | 'BLACK'
 type Errors = Partial<Record<'players' | 'playedAt' | 'eco' | 'opening' | 'notes' | 'moves', string>>
@@ -52,7 +55,8 @@ export function LogGamePage() {
   const [opening, setOpening] = useState('')
   const [eco, setEco] = useState('')
   const [notes, setNotes] = useState('')
-  const [moves, setMoves] = useState('')
+  const [moves, setMoves] = useState<string | null>(null)
+  const [recordMoves, setRecordMoves] = useState(false)
   const [swapped, setSwapped] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
   const l = t.logGame
@@ -110,7 +114,7 @@ export function LogGamePage() {
       opening: opening.trim() || undefined,
       eco: eco.trim() || undefined,
       notes: notes.trim() || undefined,
-      moves: moves.trim() || undefined,
+      moves: moves ?? undefined,
       matchId: match?.matchId,
     })
   }
@@ -206,7 +210,7 @@ export function LogGamePage() {
             {(p) => <Input {...p} type="datetime-local" value={playedAt} max={toLocalInput(new Date())} onChange={(e) => setPlayedAt(e.target.value)} />}
           </Field>
 
-          <details className="rounded-control border border-line [&_summary::-webkit-details-marker]:hidden" open={!!(errors.eco || errors.opening || errors.notes || errors.moves)}>
+          <details className="rounded-control border border-line [&_summary::-webkit-details-marker]:hidden" open={!!(errors.eco || errors.opening || errors.notes)}>
             <summary className="cursor-pointer list-none px-4 py-3 text-[0.9375rem] font-medium text-muted hover:text-ink">
               {l.details} <span className="text-faint">({t.common.optional})</span>
             </summary>
@@ -222,11 +226,27 @@ export function LogGamePage() {
               <Field label={l.notes} error={errors.notes}>
                 {(p) => <Textarea {...p} value={notes} maxLength={1000} onChange={(e) => setNotes(e.target.value)} placeholder={l.notesPlaceholder} />}
               </Field>
-              <Field label={l.moves} hint={l.movesHint} error={errors.moves}>
-                {(p) => <Textarea {...p} value={moves} maxLength={20000} onChange={(e) => setMoves(e.target.value)} placeholder="1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5" spellCheck={false} />}
-              </Field>
             </div>
           </details>
+
+          {recordMoves ? (
+            <div className="rounded-control border border-line p-4">
+              <Suspense fallback={<p className="text-sm text-muted">{t.moves.loading}</p>}>
+                <MoveRecorder
+                  value={moves}
+                  onChange={setMoves}
+                  orientation={derived.black === me!.id ? 'black' : 'white'}
+                  result={derived.result}
+                />
+              </Suspense>
+              {errors.moves && <p className="mt-2 text-[0.8125rem] text-accent">{errors.moves}</p>}
+            </div>
+          ) : (
+            <Button type="button" variant="secondary" className="self-start" onClick={() => setRecordMoves(true)}>
+              <ListOrdered aria-hidden className="size-4.5" />
+              {t.moves.add} <span className="font-normal text-faint">({t.common.optional})</span>
+            </Button>
+          )}
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             {isAdmin && !matchPair ? (

@@ -19,6 +19,8 @@ vi.mock('../../api/endpoints', () => ({
   socialApi: {
     comments: vi.fn(),
     addComment: vi.fn(),
+    likeComment: vi.fn(),
+    unlikeComment: vi.fn(),
     editComment: vi.fn(),
     deleteComment: vi.fn(),
     kudos: vi.fn(),
@@ -47,12 +49,20 @@ function wrap(ui: ReactNode) {
 
 const comment = (over: Partial<GameComment> = {}): GameComment => ({
   id: 1,
+  parentId: null,
   author: per,
+  replyTo: null,
   body: 'Nice game',
   createdAt: new Date(Date.now() - 60_000).toISOString(),
   editedAt: null,
+  deleted: false,
+  likeCount: 0,
+  likedByMe: false,
+  likedBy: [],
   canEdit: false,
   canDelete: false,
+  canLike: true,
+  replies: [],
   ...over,
 })
 
@@ -122,7 +132,7 @@ describe('GameComments', () => {
     expect(post).toBeDisabled()
     await userEvent.type(box, '  Thanks!  ')
     await userEvent.click(post)
-    expect(socialApi.addComment).toHaveBeenCalledWith(42, 'Thanks!')
+    expect(socialApi.addComment).toHaveBeenCalledWith(42, 'Thanks!', undefined)
     expect(await screen.findByText('Thanks!')).toBeInTheDocument()
     expect(box).toHaveValue('')
   })
@@ -173,6 +183,90 @@ describe('GameComments', () => {
     await userEvent.click(screen.getByRole('button', { name: s.post }))
     expect(await screen.findByText(en.errors.network)).toBeInTheDocument()
     expect(screen.getByLabelText(s.write)).toHaveValue('Important thought')
+  })
+})
+
+describe('comment threads and likes', () => {
+  beforeEach(() => {
+    vi.mocked(socialApi.comments).mockReset()
+    vi.mocked(socialApi.addComment).mockReset()
+    vi.mocked(socialApi.likeComment).mockReset()
+    vi.mocked(socialApi.unlikeComment).mockReset()
+  })
+
+  it('shows replies under their comment, with who they answer', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([
+      comment({
+        id: 1,
+        body: 'Great finish',
+        replies: [
+          comment({ id: 2, parentId: 1, author: kari, replyTo: per, body: 'Thanks!' }),
+          comment({ id: 3, parentId: 1, author: ola, replyTo: kari, body: 'Lucky' }),
+        ],
+      }),
+    ])
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    const thread = (await screen.findByText('Great finish')).closest('li')!
+    const replies = within(thread).getByRole('list', { name: s.replies(2) })
+    expect(within(replies).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(replies).getByText(s.replyingTo('Kari Nordmann'))).toBeInTheDocument()
+  })
+
+  it('replies inside the thread', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([comment({ id: 1, body: 'Great finish' })])
+    vi.mocked(socialApi.addComment).mockResolvedValue(comment({ id: 2, parentId: 1, author: kari }))
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    const thread = (await screen.findByText('Great finish')).closest('li')!
+    await userEvent.click(within(thread).getByRole('button', { name: s.reply }))
+    const box = within(thread).getByLabelText(s.replyTo('Per Olsen'))
+    expect(box).toHaveFocus()
+    await userEvent.type(box, 'Thank you!')
+    await userEvent.click(within(thread).getByRole('button', { name: s.postReply }))
+    expect(socialApi.addComment).toHaveBeenCalledWith(42, 'Thank you!', 1)
+  })
+
+  it('sends with Ctrl+Enter', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([])
+    vi.mocked(socialApi.addComment).mockResolvedValue(comment())
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    await userEvent.type(await screen.findByLabelText(s.write), 'Quick one{Control>}{Enter}{/Control}')
+    expect(socialApi.addComment).toHaveBeenCalledWith(42, 'Quick one', undefined)
+  })
+
+  it('likes and unlikes a comment', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([comment({ id: 5, likeCount: 1, likedBy: [ola] })])
+    vi.mocked(socialApi.likeComment).mockResolvedValue({ likeCount: 2, likedByMe: true, likedBy: [ola, kari] })
+    vi.mocked(socialApi.unlikeComment).mockResolvedValue({ likeCount: 1, likedByMe: false, likedBy: [ola] })
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    const like = await screen.findByRole('button', { name: s.like })
+    expect(like).toHaveTextContent('1')
+    expect(like).toHaveAttribute('title', s.likedBy('Ola Hansen'))
+    await userEvent.click(like)
+    expect(socialApi.likeComment).toHaveBeenCalledWith(42, 5)
+    const unlike = await screen.findByRole('button', { name: s.unlike })
+    expect(unlike).toHaveTextContent('2')
+    expect(unlike).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(unlike)
+    expect(socialApi.unlikeComment).toHaveBeenCalledWith(42, 5)
+  })
+
+  it('shows the like count but no button on your own comment', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([comment({ author: kari, canLike: false, canEdit: true, likeCount: 3 })])
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    await screen.findByText('Nice game')
+    expect(screen.queryByRole('button', { name: s.like })).not.toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+  })
+
+  it('keeps a deleted comment as a placeholder for its replies', async () => {
+    vi.mocked(socialApi.comments).mockResolvedValue([
+      comment({ id: 1, deleted: true, author: null, body: '', canLike: false, replies: [comment({ id: 2, parentId: 1, body: 'Answer' })] }),
+    ])
+    wrap(<GameComments game={pendingGame({ status: 'CONFIRMED' })} />)
+    expect(await screen.findByText(s.deleted)).toBeInTheDocument()
+    expect(screen.getByText('Answer')).toBeInTheDocument()
+    const thread = screen.getByText(s.deleted).closest('li')!
+    expect(within(thread).getAllByRole('button', { name: s.reply })).toHaveLength(2) // still possible to answer
   })
 })
 

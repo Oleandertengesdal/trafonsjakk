@@ -102,10 +102,15 @@ A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revok
 | POST | `/games/{id}/dispute` | `{ reason }` (5–500 chars) |
 | POST | `/games/{id}/withdraw` | Reporter, while `PENDING` |
 | PATCH | `/games/{id}/moves` | `{ moves }` (PGN/SAN, up to 20 000 chars; blank clears). Either player or an admin, any status except `VOIDED`. Doesn't touch ratings. |
-| GET | `/games/{id}/comments` | Oldest first: `{ id, author, body, createdAt, editedAt, canEdit, canDelete }[]` |
-| POST | `/games/{id}/comments` | `{ body }` (1–1000 chars) → 201. Not on voided games. |
+| GET | `/games/{id}/context` | `{ expected: { white, black }, upset, meeting, headToHead: { games, whiteWins, draws, blackWins, firstPlayedAt }, recent: { id, playedAt, whiteId, result }[] }`. See below. |
+
+**Game context.** `expected` is each side's Glicko-2 expected score, from the ratings just before the game (the rating history) once it's confirmed, otherwise from current ratings; `black = 1 − white`. `upset` is true for a confirmed decisive game whose winner had an expected score below 0.35. `headToHead` counts the confirmed games between the two, with wins seen from this game's sides; `meeting` is this game's number among them (null if it isn't confirmed). `recent` is up to five of their other confirmed games, newest first.
+| GET | `/games/{id}/comments` | Threads, oldest first: `{ id, parentId, author, replyTo, body, createdAt, editedAt, deleted, likeCount, likedByMe, likedBy, canEdit, canDelete, canLike, replies }[]`. `replies` holds the thread's answers, oldest first (one level, like Facebook). |
+| POST | `/games/{id}/comments` | `{ body, parentId? }` (1–1000 chars) → 201. Not on voided games. With `parentId` it's a reply: answering a reply files it under the same thread, and `replyTo` is the person you answered. |
 | PATCH | `/games/{id}/comments/{commentId}` | `{ body }`. Author only. |
-| DELETE | `/games/{id}/comments/{commentId}` | Author or admin → 204 |
+| DELETE | `/games/{id}/comments/{commentId}` | Author or admin → 204. A first comment that has replies is kept as `deleted: true` (no author, no text, no likes) so the thread still makes sense; it disappears with its last reply. |
+| PUT | `/games/{id}/comments/{commentId}/like` | Like (idempotent) → `{ likeCount, likedByMe, likedBy }`. Not your own comment (`comment.own_like`). |
+| DELETE | `/games/{id}/comments/{commentId}/like` | Remove your like (idempotent) → same shape |
 | GET | `/games/{id}/kudos` | `{ count, givenByMe, givers: PlayerRef[] }` |
 | PUT | `/games/{id}/kudos` | Give kudos (idempotent). Not on your own game (`kudos.own_game`), only once confirmed (`kudos.not_confirmed`). |
 | DELETE | `/games/{id}/kudos` | Take it back (idempotent) |

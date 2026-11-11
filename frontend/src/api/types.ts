@@ -65,12 +65,36 @@ export interface Game {
 
 export interface GameComment {
   id: number
-  author: PlayerRef
+  /** The thread's first comment, for replies. */
+  parentId: number | null
+  /** Null for a deleted comment kept because it has replies. */
+  author: PlayerRef | null
+  replyTo: PlayerRef | null
   body: string
   createdAt: string
   editedAt: string | null
+  deleted: boolean
+  likeCount: number
+  likedByMe: boolean
+  likedBy: PlayerRef[]
   canEdit: boolean
   canDelete: boolean
+  canLike: boolean
+  replies: GameComment[]
+}
+
+export interface CommentLikes {
+  likeCount: number
+  likedByMe: boolean
+  likedBy: PlayerRef[]
+}
+
+export interface GameContext {
+  expected: { white: number; black: number }
+  upset: boolean
+  meeting: number | null
+  headToHead: { games: number; whiteWins: number; draws: number; blackWins: number; firstPlayedAt: string | null }
+  recent: { id: number; playedAt: string; whiteId: number; result: GameResult }[]
 }
 
 export interface Kudos {

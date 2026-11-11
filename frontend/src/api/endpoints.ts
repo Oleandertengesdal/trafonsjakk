@@ -1,9 +1,11 @@
 import { api, json } from './client'
 import type {
   AdminUser,
+  CommentLikes,
   CreatedInvite,
   Game,
   GameComment,
+  GameContext,
   GameResult,
   GameStatus,
   Invite,
@@ -75,14 +77,19 @@ export const gamesApi = {
   dispute: (id: number, reason: string) =>
     api<Game>(`/api/games/${id}/dispute`, { method: 'POST', body: json({ reason }) }),
   withdraw: (id: number) => api<Game>(`/api/games/${id}/withdraw`, { method: 'POST' }),
+  context: (id: number) => api<GameContext>(`/api/games/${id}/context`),
   updateMoves: (id: number, moves: string | null) =>
     api<Game>(`/api/games/${id}/moves`, { method: 'PATCH', body: json({ moves }) }),
 }
 
 export const socialApi = {
   comments: (gameId: number) => api<GameComment[]>(`/api/games/${gameId}/comments`),
-  addComment: (gameId: number, body: string) =>
-    api<GameComment>(`/api/games/${gameId}/comments`, { method: 'POST', body: json({ body }) }),
+  addComment: (gameId: number, body: string, parentId?: number) =>
+    api<GameComment>(`/api/games/${gameId}/comments`, { method: 'POST', body: json({ body, parentId }) }),
+  likeComment: (gameId: number, id: number) =>
+    api<CommentLikes>(`/api/games/${gameId}/comments/${id}/like`, { method: 'PUT' }),
+  unlikeComment: (gameId: number, id: number) =>
+    api<CommentLikes>(`/api/games/${gameId}/comments/${id}/like`, { method: 'DELETE' }),
   editComment: (gameId: number, id: number, body: string) =>
     api<GameComment>(`/api/games/${gameId}/comments/${id}`, { method: 'PATCH', body: json({ body }) }),
   deleteComment: (gameId: number, id: number) =>

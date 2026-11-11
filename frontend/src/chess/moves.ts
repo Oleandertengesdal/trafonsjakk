@@ -79,3 +79,44 @@ export function finalState(sans: string[]): FinalState {
 }
 
 export { splitMovetext } from './movetext'
+
+export interface SideStats {
+  captures: number
+  checks: number
+  castled: 'short' | 'long' | null
+  promotions: number
+}
+
+export interface MoveStats {
+  plies: number
+  /** Full moves, as numbered in the score sheet. */
+  moves: number
+  white: SideStats
+  black: SideStats
+  end: FinalState
+}
+
+/** Simple numbers about a game's moves (who captured, checked, castled, promoted). */
+export function moveStats(sans: string[]): MoveStats {
+  const side = (): SideStats => ({ captures: 0, checks: 0, castled: null, promotions: 0 })
+  const white = side()
+  const black = side()
+  sans.forEach((san, i) => {
+    const s = i % 2 === 0 ? white : black
+    if (san.includes('x')) s.captures++
+    if (/[+#]$/.test(san)) s.checks++
+    if (san.includes('=')) s.promotions++
+    if (san.startsWith('O-O-O')) s.castled = 'long'
+    else if (san.startsWith('O-O')) s.castled = 'short'
+  })
+  return { plies: sans.length, moves: Math.ceil(sans.length / 2), white, black, end: finalState(sans) }
+}
+
+/** The from/to squares of every half-move, for highlighting the last move on the board. */
+export function moveSquares(sans: string[]): { from: string; to: string }[] {
+  const chess = new Chess()
+  return sans.map((san) => {
+    const m = chess.move(san)
+    return { from: m.from, to: m.to }
+  })
+}

@@ -12,7 +12,10 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import no.trafonsjakk.user.User;
 
-/** A comment on a game. */
+/**
+ * A comment on a game, or a reply in a comment's thread (one level: {@code parentId} is always the
+ * thread's first comment). A first comment that has replies is "soft" deleted so the thread stays readable.
+ */
 @Entity
 @Table(name = "game_comments")
 public class GameComment {
@@ -37,6 +40,16 @@ public class GameComment {
     @Column(name = "edited_at")
     private Instant editedAt;
 
+    @Column(name = "parent_id")
+    private Long parentId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_user_id")
+    private User replyTo;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected GameComment() {
     }
 
@@ -45,6 +58,30 @@ public class GameComment {
         this.author = author;
         this.body = body;
         this.createdAt = createdAt;
+    }
+
+    public GameComment(Long gameId, User author, String body, Instant createdAt, Long parentId, User replyTo) {
+        this(gameId, author, body, createdAt);
+        this.parentId = parentId;
+        this.replyTo = replyTo;
+    }
+
+    /** Keeps the row (its replies hang off it) but removes the text. */
+    public void softDelete(Instant at) {
+        this.body = "";
+        this.deletedAt = at;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public Long getParentId() {
+        return parentId;
+    }
+
+    public User getReplyTo() {
+        return replyTo;
     }
 
     public void edit(String body, Instant at) {

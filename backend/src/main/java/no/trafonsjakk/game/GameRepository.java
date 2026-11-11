@@ -44,6 +44,12 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.CONFIRMED")
     List<Game> findAllConfirmed();
 
+    /** Every confirmed game between two players (either colours), oldest first. */
+    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.CONFIRMED "
+            + "and ((g.white.id = :a and g.black.id = :b) or (g.white.id = :b and g.black.id = :a)) "
+            + "order by g.playedAt asc, g.id asc")
+    List<Game> findConfirmedBetween(@Param("a") Long a, @Param("b") Long b);
+
     @Query("select g from Game g where g.match.id = :matchId order by g.playedAt asc, g.id asc")
     List<Game> findByMatchId(@Param("matchId") Long matchId);
 

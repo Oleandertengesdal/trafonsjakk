@@ -25,10 +25,12 @@ public class GameController {
 
     private final GameService games;
     private final AutoConfirmService autoConfirm;
+    private final GameContextService context;
 
-    public GameController(GameService games, AutoConfirmService autoConfirm) {
+    public GameController(GameService games, AutoConfirmService autoConfirm, GameContextService context) {
         this.games = games;
         this.autoConfirm = autoConfirm;
+        this.context = context;
     }
 
     @GetMapping
@@ -67,6 +69,12 @@ public class GameController {
     @PostMapping("/{id}/dispute")
     GameDto dispute(@PathVariable long id, @Valid @RequestBody DisputeRequest req, @AuthenticationPrincipal Jwt jwt) {
         return games.dispute(id, req.reason(), CurrentUser.of(jwt));
+    }
+
+    /** Expected score, upset and head-to-head for the game page. */
+    @GetMapping("/{id}/context")
+    GameContextService.GameContext context(@PathVariable long id) {
+        return context.context(id);
     }
 
     @PatchMapping("/{id}/moves")

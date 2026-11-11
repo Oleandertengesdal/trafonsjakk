@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { finalState, formatMoves, parseMoves, positionAfter, splitMovetext } from './moves'
+import { finalState, formatMoves, moveSquares, moveStats, parseMoves, positionAfter, splitMovetext } from './moves'
 
 describe('parseMoves', () => {
   it('reads plain moves', () => {
@@ -105,5 +105,42 @@ describe('splitMovetext (for showing stored moves without loading chess.js)', ()
   it('returns null for free text it cannot read', () => {
     expect(splitMovetext('we played the italian')).toBeNull()
     expect(splitMovetext('')).toBeNull()
+  })
+})
+
+describe('moveStats', () => {
+  it('counts captures, checks, castling and promotions per side', () => {
+    const r = parseMoves('1. e4 d5 2. exd5 Qxd5 3. Nc3 Qe5+ 4. Be2 Bg4 5. Nf3 Bxf3 6. O-O Bxe2 7. Qxe2 Nc6 8. d3 O-O-O')
+    expect(r.ok).toBe(true)
+    const s = moveStats(r.ok ? r.sans : [])
+    expect(s.plies).toBe(16)
+    expect(s.moves).toBe(8)
+    expect(s.white).toEqual({ captures: 2, checks: 0, castled: 'short', promotions: 0 })
+    expect(s.black).toEqual({ captures: 3, checks: 1, castled: 'long', promotions: 0 })
+    expect(s.end).toEqual({ kind: 'ongoing', turn: 'w' })
+  })
+
+  it('counts promotions and checkmate', () => {
+    const s = moveStats(['h4', 'g5', 'hxg5', 'f6', 'gxf6', 'Nc6', 'fxe7', 'Nf6', 'exf8=Q+'])
+    expect(s.white.promotions).toBe(1)
+    expect(s.white.checks).toBe(1)
+    expect(s.white.captures).toBe(4)
+    expect(s.moves).toBe(5)
+    expect(moveStats(['f3', 'e5', 'g4', 'Qh4#']).end).toEqual({ kind: 'checkmate', result: 'BLACK_WIN' })
+    expect(moveStats(['f3', 'e5', 'g4', 'Qh4#']).black.checks).toBe(1)
+  })
+
+  it('handles no moves', () => {
+    expect(moveStats([])).toMatchObject({ plies: 0, moves: 0, white: { captures: 0 }, black: { captures: 0 } })
+  })
+})
+
+describe('moveSquares', () => {
+  it('gives the from/to squares of each half-move for highlighting', () => {
+    expect(moveSquares(['e4', 'e5', 'Nf3'])).toEqual([
+      { from: 'e2', to: 'e4' },
+      { from: 'e7', to: 'e5' },
+      { from: 'g1', to: 'f3' },
+    ])
   })
 })

@@ -38,7 +38,7 @@ public class SocialController {
     @PostMapping("/comments")
     @ResponseStatus(HttpStatus.CREATED)
     CommentDto add(@PathVariable long gameId, @Valid @RequestBody CommentRequest req, @AuthenticationPrincipal Jwt jwt) {
-        return social.add(gameId, req.body(), CurrentUser.of(jwt));
+        return social.add(gameId, req.body(), req.parentId(), CurrentUser.of(jwt));
     }
 
     @PatchMapping("/comments/{commentId}")
@@ -51,6 +51,16 @@ public class SocialController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable long gameId, @PathVariable long commentId, @AuthenticationPrincipal Jwt jwt) {
         social.delete(gameId, commentId, CurrentUser.of(jwt));
+    }
+
+    @PutMapping("/comments/{commentId}/like")
+    SocialDtos.CommentLikes like(@PathVariable long gameId, @PathVariable long commentId, @AuthenticationPrincipal Jwt jwt) {
+        return social.like(gameId, commentId, CurrentUser.of(jwt));
+    }
+
+    @DeleteMapping("/comments/{commentId}/like")
+    SocialDtos.CommentLikes unlike(@PathVariable long gameId, @PathVariable long commentId, @AuthenticationPrincipal Jwt jwt) {
+        return social.unlike(gameId, commentId, CurrentUser.of(jwt));
     }
 
     @GetMapping("/kudos")

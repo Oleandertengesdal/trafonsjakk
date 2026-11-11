@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Trophy } from 'lucide-react'
+import { Trophy, Zap } from 'lucide-react'
 import { gamesApi } from '../api/endpoints'
 import type { PlayerRef, RatingDelta as Delta } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,6 +9,7 @@ import { AdminResolveControls } from '../components/chess/AdminResolveControls'
 import { Avatar } from '../components/chess/Avatar'
 import { GameActions } from '../components/chess/GameActions'
 import { GameComments } from '../components/chess/GameComments'
+import { GameContextPanel } from '../components/chess/GameContextPanel'
 import { GameMoves } from '../components/chess/GameMoves'
 import { KudosButton } from '../components/chess/KudosButton'
 import { RatingDelta, ResultMark } from '../components/chess/ResultMark'
@@ -24,6 +25,8 @@ export function GameDetailPage() {
   const { me } = useAuth()
   const { t, f } = useI18n()
   const q = useQuery({ queryKey: ['games', 'detail', id], queryFn: () => gamesApi.get(id), enabled: Number.isInteger(id) && id > 0 })
+  // Shared with the context panel below; only a confirmed result can be an upset.
+  const ctx = useQuery({ queryKey: ['games', 'context', id], queryFn: () => gamesApi.context(id), enabled: q.data?.status === 'CONFIRMED' })
 
   if (!Number.isInteger(id) || id <= 0) return <Panel><ErrorNotice error={null} /></Panel>
   if (q.isPending) return <Skeleton className="h-72 w-full rounded-panel" />
@@ -52,6 +55,14 @@ export function GameDetailPage() {
           <ResultMark result={g.result} className={cn('text-5xl sm:text-6xl', g.status === 'VOIDED' && 'text-faint line-through')} />
           <PlayerSide player={g.black} colour={t.common.black} delta={g.ratingChange?.black} won={g.result === 'BLACK_WIN'} />
         </div>
+        {ctx.data?.upset && g.status === 'CONFIRMED' && (
+          <p className="mt-5 flex justify-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/8 px-3 py-1 text-sm font-medium text-gold">
+              <Zap aria-hidden className="size-3.5 fill-current" />
+              {t.context.upset}
+            </span>
+          </p>
+        )}
         <p className="mt-6 text-center text-[0.9375rem] text-muted">{f.dateTime(g.playedAt)}</p>
         <div className="mt-5 flex justify-center">
           <KudosButton game={g} />
@@ -85,6 +96,15 @@ export function GameDetailPage() {
         </Panel>
       )}
 
+
+      {(g.moves || g.canEditMoves) && (
+        <Panel title={g.moves ? t.viewer.title : t.moves.title}>
+          <GameMoves key={`${g.id}-${g.moves ?? ''}`} game={g} />
+        </Panel>
+      )}
+
+      {g.status !== 'VOIDED' && <GameContextPanel game={g} />}
+
       <Panel title={d.details}>
         <dl className="grid gap-x-6 gap-y-4 px-5 pt-2 pb-5 sm:grid-cols-2">
           <Detail label={d.loggedBy}>
@@ -107,11 +127,6 @@ export function GameDetailPage() {
         </dl>
       </Panel>
 
-      {(g.moves || g.canEditMoves) && (
-        <Panel title={t.moves.title}>
-          <GameMoves key={`${g.id}-${g.moves ?? ''}`} game={g} />
-        </Panel>
-      )}
 
       <Panel title={g.commentCount > 0 ? `${t.social.comments} (${g.commentCount})` : t.social.comments} id="comments">
         <GameComments game={g} />

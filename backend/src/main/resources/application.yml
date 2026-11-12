@@ -81,6 +81,12 @@ app:
     max-failed-logins-per-ip: 20
     lockout-duration: 15m
     max-registrations-per-ip-per-hour: 10
+    # Everyone who comes in through the frontend (Vercel) shares a handful of edge addresses, so these are
+    # generous: low values would let a few people lock everyone out. They cap someone who talks to the API
+    # directly and makes up a new address for every request. Guessing one account's password is stopped by
+    # the per-user lockout either way.
+    max-failed-logins-per-edge: 300
+    max-registrations-per-edge-per-hour: 100
 
 logging:
   level:

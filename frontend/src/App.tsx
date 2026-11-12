@@ -25,6 +25,10 @@ const TournamentDetailPage = lazy(() => import('./pages/TournamentDetailPage').t
 const TournamentNewPage = lazy(() => import('./pages/TournamentNewPage').then((m) => ({ default: m.TournamentNewPage })))
 const InvitesPage = lazy(() => import('./pages/InvitesPage').then((m) => ({ default: m.InvitesPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const YearPage = lazy(() => import('./pages/YearPage').then((m) => ({ default: m.YearPage })))
+const LivePage = lazy(() => import('./pages/LivePage').then((m) => ({ default: m.LivePage })))
+const LiveGamePage = lazy(() => import('./pages/LiveGamePage').then((m) => ({ default: m.LiveGamePage })))
+const TvPage = lazy(() => import('./pages/TvPage').then((m) => ({ default: m.TvPage })))
 const GameDetailPage = lazy(() => import('./pages/GameDetailPage').then((m) => ({ default: m.GameDetailPage })))
 
 const page = (node: ReactNode) => <Suspense fallback={<Skeleton className="h-96 w-full rounded-panel" />}>{node}</Suspense>
@@ -42,6 +46,8 @@ export function App() {
                 {/* Public on purpose: people who can't log in can report that too */}
                 <Route path="/feedback" element={<FeedbackPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
+                {/* Full screen, without the app's navigation */}
+                <Route path="/tv" element={<RequireAuth>{page(<TvPage />)}</RequireAuth>} />
                 <Route
                   element={
                     <RequireAuth>
@@ -53,8 +59,12 @@ export function App() {
                   <Route path="log" element={<LogGamePage />} />
                   <Route path="games" element={<GamesPage />} />
                   <Route path="games/:id" element={page(<GameDetailPage />)} />
+                  <Route path="live" element={page(<LivePage />)} />
+                  <Route path="live/:id" element={page(<LiveGamePage />)} />
                   <Route path="leaderboard" element={<LeaderboardPage />} />
                   <Route path="players/:username" element={page(<ProfilePage />)} />
+                  <Route path="year/:year" element={page(<YearPage />)} />
+                  <Route path="year/:year/:username" element={page(<YearPage />)} />
                   <Route path="tournaments" element={<TournamentsPage />} />
                   <Route path="tournaments/new" element={page(<TournamentNewPage />)} />
                   <Route path="tournaments/:id" element={page(<TournamentDetailPage />)} />

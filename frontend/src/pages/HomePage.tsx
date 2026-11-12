@@ -1,13 +1,15 @@
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Swords, Trophy } from 'lucide-react'
-import { gamesApi, leaderboardApi, tournamentsApi, usersApi } from '../api/endpoints'
+import { gamesApi, leaderboardApi, liveApi, tournamentsApi, usersApi } from '../api/endpoints'
 import { useAuth } from '../auth/AuthProvider'
 import { MonthlyAwardCard } from '../components/awards/MonthlyAwardCard'
+import { YearBanner } from '../components/year/YearBanner'
 import { TrafonFacade } from '../components/brand/TrafonFacade'
 import { Avatar } from '../components/chess/Avatar'
 import { GameActions } from '../components/chess/GameActions'
 import { GameRow } from '../components/chess/GameRow'
+import { LiveDot, LiveRow } from '../components/chess/Live'
 import { PlayerLink, Rating } from '../components/chess/PlayerLink'
 import { FormStrip, ResultMark } from '../components/chess/ResultMark'
 import { ButtonLink } from '../components/ui/Button'
@@ -28,6 +30,7 @@ export function HomePage() {
   const myMatches = useQuery({ queryKey: ['myMatches'], queryFn: tournamentsApi.myMatches })
   const board = useQuery({ queryKey: ['leaderboard'], queryFn: leaderboardApi.get })
   const recent = useQuery({ queryKey: ['games', 'recent'], queryFn: () => gamesApi.list({ size: 8 }) })
+  const live = useQuery({ queryKey: ['live'], queryFn: liveApi.running, refetchInterval: 30_000 })
 
   const firstName = me!.realName.split(' ')[0]
   const s = stats.data
@@ -70,6 +73,18 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <YearBanner />
+
+      {(live.data?.length ?? 0) > 0 && (
+        <Panel title={t.live.running} action={<LiveDot label={t.live.liveBadge} />}>
+          <ul className="divide-y divide-line px-5 pb-2">
+            {live.data!.map((g) => (
+              <LiveRow key={g.id} game={g} />
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       {/* Things that need you */}
       {(pending.data?.length ?? 0) > 0 && (

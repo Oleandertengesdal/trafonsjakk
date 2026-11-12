@@ -30,7 +30,11 @@ public record AppProperties(
     public record Invites(Duration ttl, int maxActivePerUser) {
     }
 
+    /**
+     * Per-IP limits apply to the visitor's address; the per-edge limits to the address that connected to
+     * the hosting edge, which can't be faked (see ClientAddress) and is shared by everyone behind Vercel.
+     */
     public record Security(int maxFailedLoginsPerUser, int maxFailedLoginsPerIp, Duration lockoutDuration,
-                           int maxRegistrationsPerIpPerHour) {
+                           int maxRegistrationsPerIpPerHour, int maxFailedLoginsPerEdge, int maxRegistrationsPerEdgePerHour) {
     }
 }

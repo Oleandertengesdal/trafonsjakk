@@ -6,11 +6,13 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import no.trafonsjakk.common.ApiException;
+import no.trafonsjakk.common.ClientAddress;
 import no.trafonsjakk.config.AppProperties;
 import org.springframework.stereotype.Service;
 
 /**
- * Brute-force protection: per-username lockout, per-IP failed-login limit and per-IP registration limit.
+ * Brute-force protection: per-username lockout, failed-login and registration limits per visitor address and
+ * per edge address (see {@link ClientAddress} for why both).
  * In-memory (single instance). Counters expire on their own.
  */
 @Service
@@ -32,26 +34,30 @@ public class LoginAttemptService {
                 .build();
     }
 
-    public void assertLoginAllowed(String username, String ip) {
+    public void assertLoginAllowed(String username, ClientAddress from) {
         if (count(failures, userKey(username)) >= cfg.maxFailedLoginsPerUser()
-                || count(failures, ipKey(ip)) >= cfg.maxFailedLoginsPerIp()) {
+                || count(failures, ipKey(from.client())) >= cfg.maxFailedLoginsPerIp()
+                || count(failures, edgeKey(from.edge())) >= cfg.maxFailedLoginsPerEdge()) {
             throw ApiException.tooManyRequests("auth.locked",
                     "Too many failed attempts. Try again in " + cfg.lockoutDuration().toMinutes() + " minutes.",
                     cfg.lockoutDuration()).with("minutes", cfg.lockoutDuration().toMinutes());
         }
     }
 
-    public void recordFailure(String username, String ip) {
+    public void recordFailure(String username, ClientAddress from) {
         increment(failures, userKey(username));
-        increment(failures, ipKey(ip));
+        increment(failures, ipKey(from.client()));
+        increment(failures, edgeKey(from.edge()));
     }
 
     public void recordSuccess(String username) {
         failures.invalidate(userKey(username));
     }
 
-    public void assertRegistrationAllowed(String ip) {
-        if (increment(registrations, ipKey(ip)) > cfg.maxRegistrationsPerIpPerHour()) {
+    public void assertRegistrationAllowed(ClientAddress from) {
+        boolean overClient = increment(registrations, ipKey(from.client())) > cfg.maxRegistrationsPerIpPerHour();
+        boolean overEdge = increment(registrations, edgeKey(from.edge())) > cfg.maxRegistrationsPerEdgePerHour();
+        if (overClient || overEdge) {
             throw ApiException.tooManyRequests("auth.too_many_signups", "Too many sign-up attempts. Try again later.", Duration.ofHours(1));
         }
     }
@@ -74,5 +80,9 @@ public class LoginAttemptService {
 
     private static String ipKey(String ip) {
         return "ip:" + ip;
+    }
+
+    private static String edgeKey(String ip) {
+        return "edge:" + ip;
     }
 }

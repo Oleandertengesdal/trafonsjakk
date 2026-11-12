@@ -66,7 +66,7 @@ CI runs all of this plus a gitleaks secret scan on every push (`.github/workflow
 
 | Kind | Where | Needs |
 |---|---|---|
-| Unit tests (Glicko-2, pairings, bracket, standings, stats, monthly award rules, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,award,game,auth,common}` | nothing |
+| Unit tests (Glicko-2, pairings, bracket, standings, stats, monthly award rules, year in review, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,award,review,game,auth,common}` | nothing |
 | API tests: the real app on a random port, called over HTTP with cookies and CSRF like the browser | `src/test/java/no/trafonsjakk/api` | PostgreSQL |
 
 The API tests use the `test` profile (`src/test/resources/application-test.yml`). They run in their own schema, `trafonsjakk_test`, inside the Docker database, so they never touch your dev data, and they empty all tables before each test. Point them elsewhere with `TEST_DATABASE_URL` / `TEST_DATABASE_USERNAME` / `TEST_DATABASE_PASSWORD`.
@@ -79,6 +79,7 @@ If the database isn't running, the API tests are **skipped** with a hint, so `mv
 | `GameApiTest`, `TournamentApiTest`, `RatingStatsApiTest`, `GameContextApiTest` | features end to end |
 | `SocialApiTest`, `CommentThreadsApiTest` | comments, replies, likes, kudos |
 | `AwardsApiTest` | monthly awards: the rules, Norwegian month boundaries, deciding once, frozen results |
+| `YearReviewApiTest` | year in review for a player and the group, Norwegian year boundaries, empty years, validation |
 | `SecurityApiTest`, `RateLimitApiTest` | attacks: forged tokens, stolen sessions, enumeration, over-posting, hostile input, every endpoint's access rules |
 | `InputLimitsApiTest` | every field limit on both sides of the boundary |
 | `ConcurrencyApiTest` | requests fired in parallel (double clicks, two tabs, two people) |
@@ -91,6 +92,10 @@ To add one, extend `support/IntegrationTest`. It gives you `registerAdmin()`, `r
 Vitest with jsdom and Testing Library, next to the code they test (`*.test.ts(x)`). `src/test/setup.ts` clears cookies and storage between tests. Test files get their own `tsconfig.test.json` (with Node types); the app's config excludes them, so browser code can't accidentally use Node APIs.
 
 One gotcha: write `beforeEach(() => { mock.mockReset() })` with braces. Vitest treats a function *returned* from `beforeEach` as a teardown hook and calls it after the test.
+
+### The chess engine
+
+`frontend/public/engine` holds Stockfish.js unmodified (see the README there for the version, licence and how to update). Unit tests never load it: `engine.test.ts` talks to a fake worker and the viewer tests mock `Engine.load`. To try the real engine, run the app and press *Analyser med Stockfish* on a game with moves.
 
 ### Adding or changing UI text
 
@@ -106,11 +111,14 @@ trafonsjakk/
 │   │   ├── config/          security, JWT cookie filter, typed properties, CSRF handler
 │   │   ├── game/            game logging + confirmation lifecycle, auto-confirm, game context
 │   │   ├── social/          comments (replies, likes) and kudos
+│   │   ├── live/            live games (moves saved as they're played)
 │   │   ├── rating/          Glicko-2 engine, recompute, leaderboard
 │   │   ├── award/           player of the month
+│   │   ├── review/          year in review ("Årets sjakk")
 │   │   ├── tournament/      round-robin & knockout engines, standings
 │   │   ├── stats/           profile statistics
-│   │   ├── user/ admin/ common/
+│   │   ├── user/            profiles, settings, your data (export, account deletion)
+│   │   ├── admin/ common/
 │   ├── src/main/resources/
 │   │   ├── application*.yml
 │   │   └── db/migration/    Flyway SQL
@@ -119,7 +127,11 @@ trafonsjakk/
 │   ├── src/api/             fetch client (CSRF + refresh), endpoints, DTO types
 │   ├── src/auth/            session provider, route guards
 │   ├── src/components/      ui/ (design system), chess/ (domain widgets), awards/, admin/, brand/, layout/
-│   ├── src/chess/           move legality, PGN and move statistics (chess.js)
+│   ├── src/chess/           move legality, PGN and move statistics (chess.js), Stockfish analysis
+│   ├── public/engine/       Stockfish 18 (WebAssembly, GPLv3), served as-is
+│   ├── public/              app manifest, icons, service worker (sw.js) and offline page
+│   ├── src/hooks/           useWakeLock (keeps the screen on)
+│   ├── src/lib/             theme, error reporting (optional Sentry), small helpers
 │   ├── src/i18n/            Norwegian/English dictionaries and formatting
 │   ├── src/pages/           one file per route
 │   └── vercel.json          SPA routing, /api proxy, security headers

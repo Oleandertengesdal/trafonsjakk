@@ -64,6 +64,9 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -134,6 +137,21 @@ public class User {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /** Set when the person deleted their account; such an account can never be switched back on. */
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    /** Removes everything that identifies the person. Their games stay, under {@code realName}. */
+    public void anonymise(String username, String realName, String unusablePasswordHash, Instant at) {
+        this.username = username;
+        this.realName = realName;
+        this.passwordHash = unusablePasswordHash;
+        this.role = Role.USER;
+        this.enabled = false;
+        this.deletedAt = at;
     }
 
     public double getRating() {

@@ -34,11 +34,15 @@ public final class UserDtos {
             @NotNull @Size(min = 10, max = 72, message = "must be 10–72 characters") String newPassword) {
     }
 
+    public record DeleteAccountRequest(@NotBlank String password) {
+    }
+
+    /** {@code deleted}: the person deleted their account; it can't be switched back on. */
     public record AdminUser(long id, String username, String realName, Role role, boolean enabled,
-                            Instant createdAt, int ratedGames, int rating) {
+                            Instant createdAt, int ratedGames, int rating, boolean deleted) {
         public static AdminUser of(User u) {
             return new AdminUser(u.getId(), u.getUsername(), u.getRealName(), u.getRole(), u.isEnabled(),
-                    u.getCreatedAt(), u.getRatedGames(), (int) Math.round(u.getRating()));
+                    u.getCreatedAt(), u.getRatedGames(), (int) Math.round(u.getRating()), u.getDeletedAt() != null);
         }
     }
 

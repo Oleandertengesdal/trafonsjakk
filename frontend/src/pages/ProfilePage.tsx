@@ -6,6 +6,7 @@ import { ApiError } from '../api/client'
 import { gamesApi, usersApi } from '../api/endpoints'
 import type { Stats, Tally } from '../api/types'
 import { AwardBadges } from '../components/awards/AwardBadges'
+import { reviewYear } from '../components/year/season'
 import { ActivityBars } from '../components/chess/ActivityBars'
 import { Avatar } from '../components/chess/Avatar'
 import { GameRow } from '../components/chess/GameRow'
@@ -79,7 +80,14 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <AwardBadges username={p.username} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <AwardBadges username={p.username} />
+        {played && (
+          <Link to={`/year/${reviewYear().year}/${p.username}`} className="text-[0.9375rem] font-medium text-accent hover:underline">
+            {t.year.profileLink(reviewYear().year)}
+          </Link>
+        )}
+      </div>
 
       {!played ? (
         <Panel>

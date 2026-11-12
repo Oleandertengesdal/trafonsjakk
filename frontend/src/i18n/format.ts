@@ -11,6 +11,7 @@ export function makeFormatters(lang: 'nb' | 'en') {
   const monthYear = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
   const oneDecimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const narrowMonth = new Intl.DateTimeFormat(locale, { month: 'narrow', timeZone: 'UTC' })
+  const weekdayName = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' })
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
   const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 })
   const decimal = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })
@@ -39,6 +40,10 @@ export function makeFormatters(lang: 'nb' | 'en') {
       if (abs < 30 * 86_400_000) return rtf.format(Math.round(diff / 86_400_000), 'day')
       return date.format(new Date(iso))
     },
+    /** 1 = Monday … 7 = Sunday → "tirsdag" / "Tuesday" */
+    weekday: (day: number) => weekdayName.format(new Date(Date.UTC(2024, 0, day))), // 1 Jan 2024 was a Monday
+    /** "tirsdager" / "Tuesdays" */
+    weekdays: (day: number) => `${weekdayName.format(new Date(Date.UTC(2024, 0, day)))}${lang === 'nb' ? 'er' : 's'}`,
     pct: (v: number) => percent.format(v),
     decimal: (v: number) => decimal.format(v),
     /** Always one decimal: 1,5 / 0,9 / 1,0 */

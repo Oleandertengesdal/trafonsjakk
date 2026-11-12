@@ -42,6 +42,19 @@ public class KudosRepository {
                 viewerId, ids);
     }
 
+    /** game id → number of kudos, for games that have any. */
+    public java.util.Map<Long, Integer> counts(Collection<Long> gameIds) {
+        if (gameIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        java.util.Map<Long, Integer> out = new java.util.HashMap<>();
+        jdbc.query("select game_id, count(*) n from game_kudos where game_id = any (?) group by game_id",
+                rs -> {
+                    out.put(rs.getLong("game_id"), rs.getInt("n"));
+                }, (Object) gameIds.toArray(Long[]::new));
+        return out;
+    }
+
     /** Who gave kudos, earliest first. */
     public List<Long> giverIds(long gameId) {
         return jdbc.queryForList("select user_id from game_kudos where game_id = ? order by created_at, user_id",

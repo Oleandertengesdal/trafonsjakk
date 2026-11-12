@@ -60,7 +60,9 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 | GET | `/users/{username}` | `Profile` = `PlayerRef + { role, rank, memberSince, ratedGames, peakRating }` |
 | GET | `/users/{username}/stats` | Statistics dashboard payload (see below) |
 | PATCH | `/users/me` | `{ realName }` |
-| POST | `/users/me/password` | `{ currentPassword, newPassword }`, signs out other sessions |
+| POST | `/users/me/password` | `{ currentPassword, newPassword }`, signs out other sessions. Wrong guesses count toward the login lockout. |
+| GET | `/users/me/export` | Everything stored about you as JSON (`Content-Disposition: attachment`): `account`, `games`, `ratingHistory`, `comments`, `commentLikes`, `kudosGiven`, `monthlyAwards`, `tournaments`, `liveGames`, `invitesCreated`. No password hash, and nothing others wrote. |
+| POST | `/users/me/delete` | `{ password }` → 204 and logged out. Removes the person and keeps their games: the name becomes "Slettet spiller", the username `deleted_<id>`, the password can never match; comments, likes, kudos, open password links and unused invite codes go (a comment others replied to keeps its place without text); their live games stop. Wrong passwords count toward the login lockout (`auth.wrong_current_password`, then `auth.locked`). The only admin can't (`account.last_admin`). |
 
 `Stats`:
 
@@ -118,7 +120,7 @@ Every game also carries `canEditMoves`, `commentCount`, `kudosCount`, `kudosGive
 
 **Game context.** `expected` is each side's Glicko-2 expected score, from the ratings just before the game (the rating history) once it's confirmed, otherwise from current ratings; `black = 1 − white`. `upset` is true for a confirmed decisive game whose winner had an expected score below 0.35. `headToHead` counts the confirmed games between the two, with wins seen from this game's sides; `meeting` is this game's number among them (null if it isn't confirmed). `recent` is up to five of their other confirmed games, newest first.
 
-Moves are checked for legality in the app (chess.js) before they're sent; the server stores them as text.
+Moves are checked for legality in the app (chess.js) before they're sent; the server stores them as text. Engine analysis (Stockfish) runs entirely in the browser and has no endpoint: nothing about it is sent to the server.
 
 ## Leaderboard
 
@@ -148,6 +150,62 @@ Award         { month, kind: "PLAYER_OF_MONTH"|"MOST_ACTIVE", player: PlayerRef,
 
 A month is `LIVE` until it ends, `DECIDING` for `app.awards.decide-after` (3 days, so late confirmations count), then `DECIDED`: the winners are stored once in `monthly_awards` and never change, even if an old game is corrected later. The standings for a decided month are still computed live. Deciding runs every hour, on startup and before every awards read, and is safe to run in parallel.
 
+## Year in review ("Årets sjakk")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/year/{year}` | The group's year → `GroupYear` |
+| GET | `/year/{year}/players/{username}` | One player's year → `PlayerYear`. Unknown player → 404 `player.not_found`. |
+
+`year` is 2000 up to the current year (otherwise 400 `year.bad_year`; not a number → 400 `request.malformed`). A year runs from 1 January to 31 December in Norwegian time and only confirmed games count. `complete` is false while the year is still going. Ratings are whole numbers; `expected` is the winner's Glicko-2 expected score (0–1) before the game, from the rating history.
+
+```ts
+PlayerYear { year, complete, player: PlayerRef, games, wins, draws, losses, points,
+             ratingStart, ratingEnd, ratingPeak,                 // null when games is 0
+             ratingByMonth: { month: "YYYY-MM", rating }[],      // rating at the end of each month played
+             bestMonth: { month, games, wins, draws, losses, overExpected, ratingChange } | null,
+             biggestUpset: Upset | null,                         // the win with the lowest expected score
+             rival: { opponent: PlayerRef, games, wins, draws, losses } | null,
+             longestWinStreak: Streak | null, favoriteOpening: { name, games, scorePct } | null,
+             busiestWeekday: { day /* 1 = Monday */, games } | null, monthsActive,
+             mostKudos: BuzzGame | null, gamesWithMoves, rankByGames, players,
+             awards: { month, kind: "PLAYER_OF_MONTH"|"MOST_ACTIVE" }[] }
+GroupYear  { year, complete, games, players, whiteWins, draws, blackWins, gamesWithMoves, kudos, comments,
+             busiestMonth: { month, games } | null, busiestWeekday: { day, games } | null,
+             gameOfTheYear: BuzzGame | null,                     // most kudos + comments
+             giantKiller: Upset | null,                          // the lowest-odds win of the year (below 0.5)
+             awardLeaders: { player, playerOfMonth, mostActive }[],   // top 5
+             mostGames: { player, games }[], climbers: { player, change, start, end }[],  // top 3
+             longestWinStreak: Streak | null,
+             topRivalry: { a, b, games, aWins, draws, bWins } | null }  // a has at least as many wins as b
+Upset    { gameId, playedAt, winner: PlayerRef, loser: PlayerRef, expected, winnerRating, loserRating }
+Streak   { player: PlayerRef, length, from, to }
+BuzzGame { game: { id, white, black, result, playedAt }, kudos, comments }
+```
+
+How the highlights are chosen:
+
+- **Best month:** the most points over expectation (as for player of the month) among months with at least two games; ties go to more games, then the bigger rating gain.
+- **Rival:** the opponent played most; ties go to the closest record, then the most recent game.
+- **Favourite opening:** the opening name entered most often (ignoring case and spaces); null if no openings were entered. Openings and moves are optional, so the review never depends on them.
+- **Climbers:** rating gain over the year, for players with at least 3 games that year.
+- **Rivalry of the year:** the pair who met most (at least twice); ties go to the closest record.
+
+## Live games
+
+A game being played right now. A player (or an admin) records it on a phone: every save sends the whole move text plus the `version` the phone last saw, and a save on an older version is refused, so two phones can't overwrite each other. Everyone else follows by polling. Recording moves is optional. Finishing logs an ordinary game (played when the live game started, with the moves if any) that the opponent confirms as usual. A live game nobody has saved for 6 hours is treated as abandoned.
+
+`LiveGame`: `{ id, white, black, status: "LIVE"|"FINISHED"|"ABANDONED", moves, version, startedAt, updatedAt, gameId, canRecord }`, where `canRecord` means the caller is a player or an admin.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/live` | Games being played now, newest first |
+| POST | `/live` | `{ whiteId, blackId }` → 201. You must be one of them (or an admin: `live.not_a_player`); neither may already be in a live game (`live.already_playing`). |
+| GET | `/live/{id}` | Any status (`live.not_found`) |
+| PUT | `/live/{id}/moves` | `{ moves, version }` → the updated game. Players or admins; `live.out_of_date` (409) if someone saved since `version`, `live.not_running` once it has ended. Same limits as a game's moves (20 000 characters, plain text). |
+| POST | `/live/{id}/finish` | `{ result }` → 201 `GameDto` (pending, for the opponent to confirm) |
+| POST | `/live/{id}/abandon` | → 204. Ends it without a result. |
+
 ## Tournaments
 
 | Method | Path | Notes |
@@ -172,7 +230,7 @@ A month is `LIVE` until it ends, `DECIDING` for `app.awards.decide-after` (3 day
 | GET | `/admin/games/disputed` | |
 | POST | `/admin/games/{id}/resolve` | `{ action: "CONFIRM"|"VOID", result? }`. Works on pending, disputed and confirmed games; `result` corrects the outcome. |
 | GET | `/admin/users` | |
-| PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself. Disabling also cancels their unused invite codes and open password links. |
+| PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself, and a deleted account can't be changed (`admin.user_deleted`; `AdminUser.deleted` is true). Disabling also cancels their unused invite codes and open password links. |
 | POST | `/admin/users/{id}/password-reset` | → 201 `{ token, expiresAt }`. One-time link (`/reset-password?token=…`), valid 24 h; a new link cancels the previous one. Not for yourself (`admin.cannot_change_self`) or disabled accounts (`user.disabled`). |
 | POST | `/admin/ratings/recompute` | Forces a full recompute → `{ games, players, millis }` |
 

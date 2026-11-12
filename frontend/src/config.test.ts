@@ -1,5 +1,5 @@
 // Deployment config is security-relevant: check it like code.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -29,12 +29,42 @@ describe('vercel.json', () => {
         .map(([k, ...v]) => [k, v]),
     )
     expect(csp['default-src']).toEqual(["'self'"])
-    expect(csp['script-src']).toEqual(["'self'"]) // no inline scripts, no eval, no CDNs
-    expect(csp['connect-src']).toEqual(["'self'"]) // the API is same-origin through the rewrite
+    // No inline scripts, no eval, no CDNs. WebAssembly is allowed for the Stockfish engine, which is served
+    // from our own origin and runs in a worker; 'wasm-unsafe-eval' doesn't allow JavaScript eval.
+    expect(csp['script-src']).toEqual(["'self'", "'wasm-unsafe-eval'"])
+    expect(csp['script-src']).not.toContain("'unsafe-eval'")
+    expect(csp['worker-src']).toEqual(["'self'"])
+    // The API is same-origin through the rewrite; Sentry receives error reports when they're switched on
+    expect(csp['connect-src']).toEqual(["'self'", 'https://*.sentry.io'])
     expect(csp['object-src']).toEqual(["'none'"])
     expect(csp['frame-ancestors']).toEqual(["'none'"])
     expect(csp['base-uri']).toEqual(["'self'"])
     expect(csp['form-action']).toEqual(["'self'"])
+  })
+
+  it('never lets a browser keep an old service worker', () => {
+    const rule = vercel.headers.find((h) => h.source === '/sw.js')
+    expect(rule?.headers).toContainEqual({ key: 'Cache-Control', value: 'no-cache' })
+  })
+
+  it('is installable as an app', () => {
+    const manifest = JSON.parse(readFileSync(join(root, 'public/manifest.webmanifest'), 'utf8')) as {
+      display: string
+      start_url: string
+      icons: { sizes: string; purpose: string; src: string }[]
+    }
+    expect(manifest.display).toBe('standalone')
+    expect(manifest.start_url).toBe('/')
+    expect(manifest.icons.map((i) => `${i.sizes} ${i.purpose}`)).toEqual(expect.arrayContaining(['192x192 any', '512x512 any', '512x512 maskable']))
+    for (const icon of manifest.icons) expect(existsSync(join(root, 'public', icon.src))).toBe(true)
+    const html = readFileSync(join(root, 'index.html'), 'utf8')
+    expect(html).toContain('rel="manifest"')
+    expect(html).toContain('rel="apple-touch-icon"')
+  })
+
+  it('serves the engine files from our own origin with a long cache', () => {
+    const rule = vercel.headers.find((h) => h.source === '/engine/(.*)')
+    expect(rule?.headers).toContainEqual({ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' })
   })
 
   it('sets the other security headers on every page', () => {

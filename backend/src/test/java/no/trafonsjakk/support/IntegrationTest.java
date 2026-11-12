@@ -36,7 +36,7 @@ public abstract class IntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbc.execute("TRUNCATE rating_history, games, tournament_matches, tournament_participants, tournaments, "
+        jdbc.execute("TRUNCATE live_games, rating_history, games, tournament_matches, tournament_participants, tournaments, "
                 + "monthly_awards, comment_likes, game_comments, game_kudos, password_reset_tokens, invite_redemptions, "
                 + "refresh_tokens, invite_codes, users RESTART IDENTITY CASCADE");
     }

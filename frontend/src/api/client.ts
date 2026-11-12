@@ -1,5 +1,7 @@
 // Fetch wrapper: same-origin cookies, CSRF header, and one silent refresh on 401.
 
+import { reportServerError } from '../lib/errorReporting'
+
 /**
  * An API failure. `code` is the server's stable error code (translated by `useErrorText`);
  * `message` is an English fallback for logs.
@@ -92,6 +94,8 @@ async function send(path: string, init: RequestInit): Promise<Response> {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 async function toError(res: Response): Promise<ApiError> {
+  // A crash on the server (not a sleeping server, which answers 502–504 through the proxy)
+  if (res.status === 500) reportServerError(500, res.url ? new URL(res.url).pathname : '')
   let message = `HTTP ${res.status}`
   let code: string | null = null
   let params: Record<string, unknown> = {}

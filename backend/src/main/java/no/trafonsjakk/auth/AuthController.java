@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import no.trafonsjakk.common.ApiException;
+import no.trafonsjakk.common.ClientAddress;
 import no.trafonsjakk.common.CurrentUser;
 import no.trafonsjakk.user.UserDtos.Me;
 import no.trafonsjakk.user.UserRepository;
@@ -47,7 +48,7 @@ public class AuthController {
     @PostMapping("/login")
     Me login(@Valid @RequestBody AuthDtos.LoginRequest req, HttpServletRequest request,
              HttpServletResponse response) {
-        TokenService.IssuedTokens issued = auth.login(req.username(), req.password(), request.getRemoteAddr());
+        TokenService.IssuedTokens issued = auth.login(req.username(), req.password(), ClientAddress.of(request));
         cookies.write(response, issued);
         return Me.of(issued.user());
     }
@@ -56,7 +57,7 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     Me register(@Valid @RequestBody AuthDtos.RegisterRequest req, HttpServletRequest request,
                 HttpServletResponse response) {
-        TokenService.IssuedTokens issued = auth.register(req, request.getRemoteAddr());
+        TokenService.IssuedTokens issued = auth.register(req, ClientAddress.of(request));
         cookies.write(response, issued);
         return Me.of(issued.user());
     }

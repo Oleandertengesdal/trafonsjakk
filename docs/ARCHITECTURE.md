@@ -71,6 +71,8 @@ erDiagram
     GAME_COMMENTS ||--o{ COMMENT_LIKES : has
     GAMES ||--o{ GAME_KUDOS : has
     USERS ||--o{ MONTHLY_AWARDS : wins
+    USERS ||--o{ LIVE_GAMES : plays
+    LIVE_GAMES |o--o| GAMES : "becomes"
 
     USERS {
         bigint id PK
@@ -85,6 +87,7 @@ erDiagram
         int rated_games
         float peak_rating
         timestamptz last_game_at
+        timestamptz deleted_at "set when the person deleted their account"
     }
     GAMES {
         bigint id PK
@@ -164,6 +167,18 @@ erDiagram
         float rating_change
         timestamptz decided_at
     }
+    LIVE_GAMES {
+        bigint id PK
+        bigint white_id FK
+        bigint black_id FK
+        bigint started_by FK
+        varchar status "LIVE | FINISHED | ABANDONED"
+        text moves "nullable, saved after every move"
+        bigint version "counts saves"
+        bigint game_id FK "the logged game, once finished"
+        timestamptz started_at
+        timestamptz updated_at
+    }
     REFRESH_TOKENS {
         bigint id PK
         bigint user_id FK
@@ -237,15 +252,17 @@ The full DDL is in the Flyway migrations: [`V1__init.sql`](../backend/src/main/r
 no.trafonsjakk
 ├── TrafonsjakkApplication
 ├── config/        SecurityConfig, JwtConfig, AppProperties, SpaCsrfTokenRequestHandler,
-│                  CookieJwtAuthenticationFilter, ControlCharacterFilter, ProblemWriter
-├── common/        ApiException, GlobalExceptionHandler (RFC 7807), CurrentUser, Tokens,
+│                  CookieJwtAuthenticationFilter, ControlCharacterFilter, ProblemWriter,
+│                  RequestSizeLimitFilter, DeploymentSafetyCheck
+├── common/        ApiException, GlobalExceptionHandler (RFC 7807), CurrentUser, Tokens, ClientAddress,
 │                  validation/PlainText
 ├── auth/          AuthController, AuthService, TokenService, AuthCookies,
 │                  LoginAttemptService, RefreshToken(+Repository),
 │                  InviteCode, InviteRedemption (+Repositories), InviteService, InviteController,
 │                  PasswordResetToken(+Repository), PasswordResetService
 ├── user/          User, Role, PlayerRef, UserRepository, UserService, UserController
-│                  (profile and statistics endpoints)
+│                  (profile and statistics endpoints), AccountService (your data, deleting)
+├── live/          LiveGame(+Repository), LiveGameService, LiveGameController, LiveDtos
 ├── game/          Game, GameResult, GameStatus, GameRepository, GameService, GameMapper,
 │                  GameController, AutoConfirmService, GameContextService
 ├── social/        GameComment(+Repository), CommentLikeRepository, KudosRepository,
@@ -253,6 +270,7 @@ no.trafonsjakk
 ├── rating/        Glicko2 (pure math), RatingHistory(+Repository),
 │                  RatingService (recompute), LeaderboardService, LeaderboardController
 ├── award/         MonthlyAwardCalculator (pure), AwardRepository, AwardService, AwardController
+├── review/        YearReviewCalculator (pure), YearReviewService, YearReviewController, YearReviewDtos
 ├── tournament/    Tournament, TournamentMatch, TournamentParticipant, enums,
 │                  repositories, TournamentService, TournamentController,
 │                  RoundRobinScheduler, KnockoutBracket, StandingsCalculator (pure)
@@ -260,7 +278,7 @@ no.trafonsjakk
 └── admin/         AdminController
 ```
 
-Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
+Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`, `YearReviewCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
 
 ### 3.3 Game lifecycle (opponent confirmation)
 
@@ -366,7 +384,19 @@ Two awards per calendar month (Norwegian time), from confirmed games only:
 
 `MonthlyAwardCalculator` holds these rules as pure functions. `AwardService` computes standings on the fly for any month, and *decides* a month 3 days after it ends (so late confirmations count): it inserts one row per award into `monthly_awards` with `on conflict do nothing`, and never updates it. Deciding runs hourly, on startup and before every awards read (the same "free hosting sleeps" reasoning as auto-confirm), and catches up on every finished month that isn't decided yet. The zone, grace period and minimum are `app.awards.*` settings.
 
-### 3.8 Error format
+### 3.8 Year in review ("Årets sjakk")
+
+`YearReviewCalculator` sums up a calendar year (Norwegian time) of confirmed games, per player and for the group: games and record, rating from the first to the last game of the year, the best month (points over expectation, at least two games), the biggest upset (the win with the lowest pre-game expected score), the rival (most games, then closest record), the longest winning streak, the favourite opening, the busiest weekday, the game with most kudos, and the year's monthly awards. The group side adds the game of the year (most kudos + comments), the giant killer, award leaders, most games, climbers and the rivalry of the year. Everything is computed on request from the games and the rating history; nothing is stored. Openings and moves are optional, so every highlight that needs them is simply left out when they're missing. See [API.md](API.md#year-in-review-årets-sjakk) for the exact rules.
+
+### 3.9 Live games
+
+`live_games` holds games being played right now (V5). The design is deliberately simple because the free API sleeps and has one instance: no WebSockets, just polling. The recorder saves the whole move text after every move with the version it last saw; the row is locked while saving (`findByIdForUpdate`) and an older version is refused with `live.out_of_date`, after which the phone takes the newer moves. Followers poll every 3 seconds, the TV every 4. Finishing goes through `GameService.create`, so the normal confirmation, rating and tournament rules apply unchanged. Idle games (6 hours without a save) are marked abandoned whenever live games are read.
+
+### 3.10 Your data and deleting an account
+
+`AccountService.export` collects everything stored about the person with plain SQL. `delete` (password required, same lockout as login) keeps the games and rating history, because they are the opponents' history too, and removes what identifies the person: see [API.md](API.md#users). `users.deleted_at` marks it so an admin can't switch it back on, and `deleted_` usernames can't be registered.
+
+### 3.11 Error format
 
 All errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) `application/problem+json` with a stable `code` that the frontend translates (see [API.md](API.md)):
 
@@ -393,7 +423,7 @@ Stack traces and SQL never reach the client.
 | Charts | Recharts |
 | Icons | Lucide React |
 | Fonts | Self-hosted via `@fontsource` (no third-party font requests; tight CSP) |
-| Languages | Norwegian bokmål (default) and English, own lightweight typed i18n (§4.5) |
+| Languages | Norwegian bokmål (default) and English, own lightweight typed i18n (§4.6) |
 
 ### 4.2 Routes
 
@@ -402,17 +432,22 @@ Stack traces and SQL never reach the client.
 | `/login`, `/register` | Auth (register requires invite code) | public |
 | `/reset-password` | Choose a new password from an admin's one-time link | public |
 | `/feedback` | "Found a problem?": how to report a bug by email | public |
-| `/` | Home: your rating card, pending confirmations, tournament games to play, player of the month (last month's winners and this month's top three), latest games, top of the table, active tournaments | member |
+| `/` | Home: your rating card, in December and January the year in review, pending confirmations, tournament games to play, player of the month (last month's winners and this month's top three), latest games, top of the table, active tournaments | member |
 | `/log` | Log a game (optionally pre-filled from a tournament match) | member |
 | `/games` | All games, filter by player/status | member |
 | `/games/:id` | Game detail: confirm / dispute / withdraw, kudos, replay with move statistics, expected score / upset / head-to-head, moves, comments with replies and likes | member |
 | `/leaderboard` | Ratings table, and the monthly standings with earlier winners | member |
-| `/players/:username` | Profile + statistics dashboard, award badges | member |
+| `/players/:username` | Profile + statistics dashboard, award badges, link to their year in review | member |
+| `/year/:year` | Year in review for the group: story cards | member |
+| `/year/:year/:username` | Year in review for one player: story cards that can be shared as images | member |
 | `/tournaments` | List | member |
 | `/tournaments/new` | Create | member |
 | `/tournaments/:id` | Standings & fixtures (RR) or bracket (KO) | member |
 | `/invites` | Create / revoke invite codes | member |
-| `/settings` | Real name, password, language, light/dark | member |
+| `/live` | Games being played now, start a live game, link to TV mode | member |
+| `/live/:id` | A player records the moves on the board (saved after every move) and taps the result; others follow the board. Keeps the screen on. | member |
+| `/tv` | TV mode: full-screen, read-only scoreboard (live boards, ratings, latest results), always dark, keeps the screen on. Outside the app's navigation. | member |
+| `/settings` | Real name, password, language, light/dark, download your data, delete your account | member |
 | `/admin` | Disputes, users (role/enable, password links), recompute ratings | admin |
 
 ### 4.3 Component structure
@@ -432,17 +467,41 @@ src/
 │   │                            GameActions, AdminResolveControls, RatingChart, ActivityBars,
 │   │                            Crosstable, Bracket, PlayerSelect, MoveRecorder, GameMoves,
 │   │                            GameViewer (replay + move statistics), GameContextPanel,
-│   │                            GameComments, KudosButton
+│   │                            GameComments, KudosButton, EvalGraph/EvalBar (engine analysis)
 │   ├── awards/                  MonthlyAwardCard (home), AwardsPanel (ratings page), AwardBadges (profile)
+│   ├── year/                    StoryViewer, StoryCard, player and group slides, shareCard (card → PNG),
+│   │                            YearBanner (home, December–January)
 │   └── admin/                   ResetLinkButton
-├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts
+├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts,
+│                                engine.ts (Stockfish over UCI in a Web Worker), analysis.ts (scores, judgements,
+│                                accuracy), useAnalysis.ts (runs it, caches results in this browser)
 ├── pages/                       one file per route
 ├── i18n/                        en.ts, nb.ts (dictionaries), I18nProvider, format.ts (locale-aware
 │                                dates/numbers), rounds.ts, useErrorText.ts (server error codes → text)
 └── lib/                         cn.ts, theme.ts, gameResult.ts, safePath.ts, contact.ts
 ```
 
-### 4.4 Visual language: the Trafon facade
+### 4.4 Engine analysis (Stockfish in the browser)
+
+Analysis is optional and only offered for games with recorded moves. Nothing runs until someone presses *Analyser med Stockfish*:
+
+1. `Engine.load()` starts Stockfish 18 (the 7 MB "lite, single-threaded" WebAssembly build in `public/engine`, GPLv3, served unmodified from our own origin) in a **Web Worker** and does the UCI handshake. Single-threaded means no cross-origin-isolation headers are needed.
+2. Every position of the game is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. The user can stop it at any time, and the worker is terminated when they leave the page.
+3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, averaged per player.
+4. The viewer shows an evaluation bar, a graph of the game (tap to jump), the marks in the move list, a sentence per move ("5. Nxf7? Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine's next move as an arrow, and a table per player.
+5. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so reopening the game shows them at once. Nothing is sent to the server.
+
+The CSP allows this with `script-src 'self' 'wasm-unsafe-eval'` and `worker-src 'self'`; JavaScript `eval` stays forbidden.
+
+### 4.4b Installable app (PWA)
+
+`public/manifest.webmanifest` (standalone, icons incl. a maskable one, shortcuts to Live, Log game and TV) and the Apple meta tags in `index.html` let people add Trafonsjakk to the home screen of a phone or tablet, where it opens without the browser bar. `public/sw.js` is deliberately minimal: it caches nothing but an offline page, so every deploy shows up immediately. It's registered only in production builds. `useWakeLock` keeps the screen on during a live game and on the TV (Screen Wake Lock API; quietly does nothing where unsupported).
+
+### 4.4c Error alerts (optional)
+
+With `VITE_SENTRY_DSN` set at build time, `lib/errorReporting.ts` loads Sentry (in its own chunk, only then) and reports crashes in the browser plus any `500` from the API, since the API itself has no error alerts. No user data, IP, cookies, headers, bodies or URL query strings are sent (reset tokens and invite codes travel in query strings). Without the variable nothing is loaded.
+
+### 4.5 Visual language: the Trafon facade
 
 The look is drawn from the Trafon building (a red-painted two-storey facade with cream window trim, arched windows and a slate roof), without any reference to the organisations that use it.
 
@@ -455,6 +514,8 @@ The look is drawn from the Trafon building (a red-painted two-storey facade with
 | `win` / `loss` / `draw` | green / brick / slate | lighter variants | results, rating changes |
 | `gold` | `#8A6416` | `#D8AF5A` | "waiting for confirmation", upsets and monthly awards |
 
+The year-in-review story cards use the facade's colours as **fixed** values (brick, slate roof, window-trim cream, brass, the green door) rather than theme tokens, so a card looks the same in light and dark mode and in the shared image. Each card is shaped like the building's arched windows, and its big number is sized in container units so it scales with the card.
+
 `brand` and `accent` are split so red text stays readable on dark backgrounds while red buttons keep enough contrast for cream labels. Every text/background pair was measured to be at least 4.5:1.
 
 - **One bold element:** the home rating card is a red "facade" with painted brick courses and a line drawing of the building. The champion banner reuses it. Everything else is quiet cream panels.
@@ -464,7 +525,7 @@ The look is drawn from the Trafon building (a red-painted two-storey facade with
 - **Motion:** 150–200 ms transitions, one rising-number animation on the rating, skeleton loaders, and `prefers-reduced-motion` respected.
 - **Themes:** light by default; dark is a separately tuned evening palette (Settings → Appearance), remembered per device.
 
-### 4.5 Languages (i18n)
+### 4.6 Languages (i18n)
 
 - `i18n/en.ts` defines every UI string; `i18n/nb.ts` is typed as `Dict = typeof en`, so **the build fails if Norwegian is missing a key or has a different function signature**. Strings that need values are functions (`games: (n) => …`) and handle plurals.
 - `useI18n()` returns `t` (the dictionary for the current language), `f` (locale-aware formatters: `nb-NO`/`en-GB` dates, relative times like "for 4 timer siden", `60 %` vs `60%`) and `setLang`.

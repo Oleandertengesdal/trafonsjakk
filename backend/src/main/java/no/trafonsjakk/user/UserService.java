@@ -4,9 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import no.trafonsjakk.auth.InviteCodeRepository;
+import no.trafonsjakk.auth.LoginAttemptService;
 import no.trafonsjakk.auth.PasswordResetTokenRepository;
 import no.trafonsjakk.auth.TokenService;
 import no.trafonsjakk.common.ApiException;
+import no.trafonsjakk.common.ClientAddress;
 import no.trafonsjakk.common.CurrentUser;
 import no.trafonsjakk.user.UserDtos.AdminUpdateUserRequest;
 import no.trafonsjakk.user.UserDtos.AdminUser;
@@ -23,10 +25,13 @@ public class UserService {
     private final TokenService tokens;
     private final InviteCodeRepository invites;
     private final PasswordResetTokenRepository resets;
+    private final LoginAttemptService attempts;
 
     public UserService(UserRepository users, PasswordEncoder passwordEncoder, TokenService tokens,
-                       InviteCodeRepository invites, PasswordResetTokenRepository resets) {
+                       InviteCodeRepository invites, PasswordResetTokenRepository resets,
+                       LoginAttemptService attempts) {
         this.resets = resets;
+        this.attempts = attempts;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
@@ -47,9 +52,12 @@ public class UserService {
 
     /** Changes the password and signs out every other session. */
     @Transactional
-    public TokenService.IssuedTokens changePassword(CurrentUser actor, String current, String next) {
+    public TokenService.IssuedTokens changePassword(CurrentUser actor, String current, String next, ClientAddress from) {
         User u = me(actor);
+        // Someone holding a stolen session must not be able to guess the password here faster than at the login.
+        attempts.assertLoginAllowed(u.getUsername(), from);
         if (!passwordEncoder.matches(current, u.getPasswordHash())) {
+            attempts.recordFailure(u.getUsername(), from);
             throw ApiException.badRequest("auth.wrong_current_password", "Your current password is incorrect");
         }
         if (next.getBytes(StandardCharsets.UTF_8).length > 72) {
@@ -71,6 +79,9 @@ public class UserService {
             throw ApiException.badRequest("admin.cannot_change_self", "You can't change your own role or status");
         }
         User u = users.findById(id).orElseThrow(() -> ApiException.notFound("user.not_found", "User not found"));
+        if (u.getDeletedAt() != null) {
+            throw ApiException.conflict("admin.user_deleted", "This person deleted their account");
+        }
         if (req.role() != null) {
             u.setRole(req.role());
         }

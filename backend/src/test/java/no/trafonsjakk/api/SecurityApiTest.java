@@ -213,11 +213,16 @@ class SecurityApiTest extends IntegrationTest {
                 new Call("GET", "/api/games/1/context"), new Call("PUT", "/api/games/1/comments/1/like"),
                 new Call("DELETE", "/api/games/1/comments/1/like"),
                 new Call("GET", "/api/awards"), new Call("GET", "/api/awards/race"),
+                new Call("GET", "/api/year/2026"), new Call("GET", "/api/year/2026/players/someone"),
                 new Call("GET", "/api/leaderboard"), new Call("GET", "/api/tournaments"),
                 new Call("POST", "/api/tournaments"), new Call("GET", "/api/tournaments/matches/mine"),
                 new Call("GET", "/api/tournaments/1"), new Call("PUT", "/api/tournaments/1/participants"),
                 new Call("POST", "/api/tournaments/1/join"), new Call("POST", "/api/tournaments/1/leave"),
-                new Call("POST", "/api/tournaments/1/start"), new Call("POST", "/api/tournaments/1/cancel"));
+                new Call("POST", "/api/tournaments/1/start"), new Call("POST", "/api/tournaments/1/cancel"),
+                new Call("GET", "/api/live"), new Call("POST", "/api/live"), new Call("GET", "/api/live/1"),
+                new Call("PUT", "/api/live/1/moves"), new Call("POST", "/api/live/1/finish"),
+                new Call("POST", "/api/live/1/abandon"),
+                new Call("GET", "/api/users/me/export"), new Call("POST", "/api/users/me/delete"));
     }
 
     private static List<Call> adminEndpoints() {

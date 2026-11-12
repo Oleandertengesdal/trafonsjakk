@@ -111,6 +111,91 @@ export interface Page<T> {
   totalPages: number
 }
 
+export interface YearGameRef {
+  id: number
+  white: PlayerRef
+  black: PlayerRef
+  result: GameResult
+  playedAt: string
+}
+
+/** A win against the odds; `expected` is the winner's expected score (0–1) before the game. */
+export interface YearUpset {
+  gameId: number
+  playedAt: string
+  winner: PlayerRef
+  loser: PlayerRef
+  expected: number
+  winnerRating: number
+  loserRating: number
+}
+
+export interface YearStreak {
+  player: PlayerRef
+  length: number
+  from: string
+  to: string
+}
+
+export interface YearBuzz {
+  game: YearGameRef
+  kudos: number
+  comments: number
+}
+
+/** "Årets sjakk" for one player. With `games: 0` everything else is empty. */
+export interface PlayerYear {
+  year: number
+  /** The year is over. */
+  complete: boolean
+  player: PlayerRef
+  games: number
+  wins: number
+  draws: number
+  losses: number
+  points: number
+  ratingStart: number | null
+  ratingEnd: number | null
+  ratingPeak: number | null
+  ratingByMonth: { month: string; rating: number }[]
+  bestMonth: { month: string; games: number; wins: number; draws: number; losses: number; overExpected: number; ratingChange: number } | null
+  biggestUpset: YearUpset | null
+  rival: { opponent: PlayerRef; games: number; wins: number; draws: number; losses: number } | null
+  longestWinStreak: YearStreak | null
+  favoriteOpening: { name: string; games: number; scorePct: number } | null
+  /** 1 = Monday … 7 = Sunday */
+  busiestWeekday: { day: number; games: number } | null
+  monthsActive: number
+  mostKudos: YearBuzz | null
+  gamesWithMoves: number
+  rankByGames: number | null
+  players: number
+  awards: { month: string; kind: AwardKind }[]
+}
+
+export interface GroupYear {
+  year: number
+  complete: boolean
+  games: number
+  players: number
+  whiteWins: number
+  draws: number
+  blackWins: number
+  gamesWithMoves: number
+  kudos: number
+  comments: number
+  busiestMonth: { month: string; games: number } | null
+  busiestWeekday: { day: number; games: number } | null
+  gameOfTheYear: YearBuzz | null
+  giantKiller: YearUpset | null
+  awardLeaders: { player: PlayerRef; playerOfMonth: number; mostActive: number }[]
+  mostGames: { player: PlayerRef; games: number }[]
+  climbers: { player: PlayerRef; change: number; start: number; end: number }[]
+  longestWinStreak: YearStreak | null
+  /** `a` has at least as many wins as `b`. */
+  topRivalry: { a: PlayerRef; b: PlayerRef; games: number; aWins: number; draws: number; bWins: number } | null
+}
+
 export type AwardKind = 'PLAYER_OF_MONTH' | 'MOST_ACTIVE'
 
 /** A decided monthly award. `overExpected` = points − expected (from Glicko-2 before each game). */
@@ -304,4 +389,22 @@ export interface AdminUser {
   createdAt: string
   ratedGames: number
   rating: number
+  /** The person deleted their account; it can't be switched back on. */
+  deleted: boolean
+}
+
+export type LiveStatus = 'LIVE' | 'FINISHED' | 'ABANDONED'
+
+/** A game being played right now. `version` counts saves; `canRecord`: you're a player (or an admin). */
+export interface LiveGame {
+  id: number
+  white: PlayerRef
+  black: PlayerRef
+  status: LiveStatus
+  moves: string | null
+  version: number
+  startedAt: string
+  updatedAt: string
+  gameId: number | null
+  canRecord: boolean
 }

@@ -2,11 +2,14 @@
 // numbers about the game. Loaded lazily (chess.js and the board), like the move recorder.
 import { useMemo, useRef, useState, useEffect, type KeyboardEvent } from 'react'
 import { Chessboard } from 'react-chessboard'
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, FlipVertical2 } from 'lucide-react'
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Cpu, FlipVertical2 } from 'lucide-react'
+import { glyph, reviewGame, scoreText, uciToSan, winPercent, type GameReview, type Judgement, type PositionEval } from '../../chess/analysis'
 import { moveSquares, moveStats, parseMoves, positionAfter } from '../../chess/moves'
+import { useAnalysis, type AnalysisState } from '../../chess/useAnalysis'
 import { useI18n } from '../../i18n/I18nProvider'
 import { cn } from '../../lib/cn'
 import { Button } from '../ui/Button'
+import { EvalBar, EvalGraph } from './EvalGraph'
 
 export interface GameViewerProps {
   moves: string
@@ -17,12 +20,18 @@ export interface GameViewerProps {
 
 /** "12. Nf3" for White's move, "12... Nf6" for Black's. */
 function label(sans: string[], ply: number) {
-  const n = Math.floor((ply - 1) / 2) + 1
-  return ply % 2 === 1 ? `${n}. ${sans[ply - 1]}` : `${n}... ${sans[ply - 1]}`
+  return numbered(ply, sans[ply - 1])
 }
 
+function numbered(ply: number, san: string) {
+  const n = Math.floor((ply - 1) / 2) + 1
+  return ply % 2 === 1 ? `${n}. ${san}` : `${n}... ${san}`
+}
+
+const glyphColour: Record<Judgement, string> = { blunder: 'text-loss', mistake: 'text-gold', inaccuracy: 'text-muted' }
+
 export default function GameViewer({ moves, orientation, whiteName, blackName }: GameViewerProps) {
-  const { t } = useI18n()
+  const { t, f } = useI18n()
   const v = t.viewer
   const parsed = useMemo(() => parseMoves(moves), [moves])
   const sans = parsed.sans
@@ -31,6 +40,9 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
   const [ply, setPly] = useState(sans.length) // opens at the final position
   const [flipped, setFlipped] = useState(false)
   const listRef = useRef<HTMLOListElement>(null)
+  const analysis = useAnalysis(sans)
+  const evals = analysis.state.status === 'done' ? analysis.state.evals : null
+  const review = useMemo(() => (evals && parsed.ok ? reviewGame(sans, evals) : null), [evals, sans, parsed.ok])
 
   const go = (p: number) => setPly(Math.max(0, Math.min(sans.length, p)))
 
@@ -69,6 +81,11 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
       )}
     >
       {sans[p - 1]}
+      {review?.moves[p - 1].judgement && (
+        <span className={cn('ml-0.5 font-sans font-semibold', p === ply ? 'text-on-accent' : glyphColour[review.moves[p - 1].judgement!])}>
+          {glyph[review.moves[p - 1].judgement!]}
+        </span>
+      )}
     </button>
   )
 
@@ -85,6 +102,11 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
   ]
   if (stats.white.promotions + stats.black.promotions > 0) statRows.push([v.promotions, stats.white.promotions, stats.black.promotions])
 
+  const whiteAtBottom = (orientation === 'white') !== flipped
+  const here = evals?.[ply]
+  const bestHere = here?.best ?? null
+  const arrows = bestHere ? [{ startSquare: bestHere.slice(0, 2), endSquare: bestHere.slice(2, 4), color: 'rgb(43 106 75 / 0.85)' }] : []
+
   return (
     <div
       role="group"
@@ -94,19 +116,30 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
       className="grid gap-5 rounded-control focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:grid-cols-[minmax(0,24rem)_1fr]"
     >
       <div className="flex flex-col gap-3">
-        <div className="overflow-hidden rounded-control border border-line">
+        <div className="flex gap-2">
+          {here && (
+            <EvalBar
+              white={winPercent(here.score)}
+              whiteAtBottom={whiteAtBottom}
+              label={t.analysis.evalBar(scoreText(here.score, f.decimal1))}
+            />
+          )}
+        <div className="min-w-0 flex-1 overflow-hidden rounded-control border border-line">
           <Chessboard
             options={{
               id: 'game-viewer',
               position: positionAfter(sans, ply),
-              boardOrientation: (orientation === 'white') !== flipped ? 'white' : 'black',
+              boardOrientation: whiteAtBottom ? 'white' : 'black',
               allowDragging: false,
+              allowDrawingArrows: false,
+              arrows,
               animationDurationInMs: 150,
               lightSquareStyle: { backgroundColor: '#f3e6d0' },
               darkSquareStyle: { backgroundColor: '#b86a58' },
               squareStyles: last ? { [last.from]: highlight, [last.to]: highlight } : {},
             }}
           />
+        </div>
         </div>
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-1">
@@ -127,13 +160,24 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
             <FlipVertical2 aria-hidden className="size-4.5" />
           </Button>
         </div>
+        {evals && review && (
+          <EvalGraph
+            wins={evals.map((e) => winPercent(e.score))}
+            marks={review.moves.filter((m) => m.judgement).map((m) => ({ ply: m.ply, judgement: m.judgement! }))}
+            ply={ply}
+            label={t.analysis.graph}
+            onSelect={go}
+          />
+        )}
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
         <div>
           <p data-testid="viewer-status" className="font-medium" aria-live="polite">
             {ply === 0 ? v.startPosition : v.afterMove(label(sans, ply))}
+            {review && ply > 0 && review.moves[ply - 1].judgement && glyph[review.moves[ply - 1].judgement!]}
           </p>
+          {review && evals && <MoveComment review={review} evals={evals} sans={sans} ply={ply} />}
           <p className="hidden text-[0.8125rem] text-faint sm:block">{v.keyboard}</p>
         </div>
 
@@ -182,7 +226,159 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
             ))}
           </tbody>
         </table>
+
+        <AnalysisSection state={analysis.state} review={review} whiteName={whiteName} blackName={blackName} onStart={analysis.start} onCancel={analysis.cancel} />
       </div>
     </div>
+  )
+}
+
+/** What the engine thinks of the move just played, and what it would play now. */
+function MoveComment({ review, evals, sans, ply }: { review: GameReview; evals: PositionEval[]; sans: string[]; ply: number }) {
+  const { t, f } = useI18n()
+  const a = t.analysis
+  const parts: string[] = []
+  if (ply > 0) {
+    const m = review.moves[ply - 1]
+    if (m.judgement) {
+      const detail =
+        m.allowedMate !== null
+          ? a.allowedMate(m.allowedMate)
+          : m.missedMate !== null
+            ? a.missedMate(m.missedMate)
+            : m.pawnsLost !== null && m.pawnsLost >= 0.1
+              ? a.cost(f.decimal1(m.pawnsLost), Math.round(m.pawnsLost * 10) === 10)
+              : null
+      parts.push(`${a.judgement[m.judgement]}${detail ? `: ${detail}` : ''}.`)
+    }
+    if (m.bestSan) {
+      if (m.judgement) parts.push(a.better(numbered(ply, m.bestSan)))
+    } else {
+      parts.push(a.best)
+    }
+  }
+  const score = evals[ply].score
+  const next = evals[ply].best
+  const nextSan = next ? uciToSan(positionAfter(sans, ply), next) : null
+  return (
+    <div data-testid="move-comment" className="mt-1 text-[0.9375rem]">
+      {parts.length > 0 && (
+        <p className={cn(ply > 0 && review.moves[ply - 1].judgement === 'blunder' && 'text-loss')}>
+          {ply > 0 && review.moves[ply - 1].judgement && <span className="font-medium">{label(sans, ply)}{glyph[review.moves[ply - 1].judgement!]} </span>}
+          {parts.join(' ')}
+        </p>
+      )}
+      <p className="text-[0.8125rem] text-muted">
+        {a.evaluation(scoreText(score, f.decimal1))}
+        {nextSan && `. ${a.bestHere(numbered(ply + 1, nextSan))}`}
+      </p>
+    </div>
+  )
+}
+
+/** The button to run the engine, its progress, and the result per player. */
+function AnalysisSection({
+  state,
+  review,
+  whiteName,
+  blackName,
+  onStart,
+  onCancel,
+}: {
+  state: AnalysisState
+  review: GameReview | null
+  whiteName: string
+  blackName: string
+  onStart: () => void
+  onCancel: () => void
+}) {
+  const { t, f } = useI18n()
+  const a = t.analysis
+
+  if (review) {
+    const rows: [string, string | number, string | number][] = [
+      [a.accuracy, f.pct(review.white.accuracy / 100), f.pct(review.black.accuracy / 100)],
+      [a.blunders, review.white.blunders, review.black.blunders],
+      [a.mistakes, review.white.mistakes, review.black.mistakes],
+      [a.inaccuracies, review.white.inaccuracies, review.black.inaccuracies],
+    ]
+    return (
+      <section aria-label={a.title} className="border-t border-line pt-4">
+        <table aria-label={a.title} className="w-full text-sm">
+          <caption className="mb-2 text-left text-[0.8125rem] text-muted">
+            <Cpu aria-hidden className="mr-1.5 inline size-3.5 align-[-0.15em]" />
+            {a.title}
+          </caption>
+          <thead>
+            <tr className="text-[0.8125rem] text-muted">
+              <th scope="col" className="pb-1 text-left font-normal">
+                <span className="sr-only">{a.title}</span>
+              </th>
+              <th scope="col" className="pb-1 text-right font-normal">
+                {whiteName}
+              </th>
+              <th scope="col" className="pb-1 text-right font-normal">
+                {blackName}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([name, w, b], i) => (
+              <tr key={name} className="border-t border-line">
+                <th scope="row" className="py-1.5 text-left font-normal text-muted">
+                  {name}
+                </th>
+                <td className={cn('py-1.5 text-right tabular-nums', i === 0 && 'font-display text-base font-semibold')}>{w}</td>
+                <td className={cn('py-1.5 text-right tabular-nums', i === 0 && 'font-display text-base font-semibold')}>{b}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-2 text-[0.75rem] text-faint">
+          {a.analysed}. {a.credit},{' '}
+          <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noreferrer" className="underline hover:text-accent">
+            {a.source}
+          </a>
+          .
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section aria-label={a.title} className="flex flex-col gap-2 border-t border-line pt-4">
+      {state.status === 'running' || state.status === 'loading' ? (
+        <>
+          <p className="text-sm font-medium" aria-live="polite">
+            {state.status === 'loading' ? a.loading : a.progress(state.done + 1, state.total)}
+          </p>
+          <div
+            role="progressbar"
+            aria-label={a.title}
+            aria-valuemin={0}
+            aria-valuemax={state.status === 'running' ? state.total : 1}
+            aria-valuenow={state.status === 'running' ? state.done : 0}
+            className="h-1.5 overflow-hidden rounded-full bg-raised"
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-200"
+              style={{ width: state.status === 'running' ? `${(state.done / state.total) * 100}%` : '4%' }}
+            />
+          </div>
+          <Button variant="ghost" size="sm" className="self-start" onClick={onCancel}>
+            {a.cancel}
+          </Button>
+        </>
+      ) : (
+        <>
+          {state.status === 'error' && <p className="text-sm text-loss">{a.failed}</p>}
+          <Button variant="secondary" size="sm" className="self-start" onClick={onStart}>
+            <Cpu aria-hidden className="size-4" />
+            {state.status === 'error' ? a.retry : a.run}
+          </Button>
+          <p className="text-[0.8125rem] text-muted">{a.intro}</p>
+        </>
+      )}
+    </section>
   )
 }

@@ -51,6 +51,10 @@ describe('makeFormatters', () => {
     expect(gb.signedDecimal(0.04)).toBe('±0.0')
     expect(gb.signedDecimal(-0.04)).toBe('±0.0')
     expect(no.decimal1(1)).toBe('1,0')
+    expect(no.weekday(2)).toBe('tirsdag')
+    expect(no.weekdays(7)).toBe('søndager')
+    expect(gb.weekday(1)).toBe('Monday')
+    expect(gb.weekdays(5)).toBe('Fridays')
     expect(gb.decimal1(1.46)).toBe('1.5')
   })
 

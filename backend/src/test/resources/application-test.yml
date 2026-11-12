@@ -23,6 +23,8 @@ app:
     # Tests register many users from 127.0.0.1; per-user lockout stays at the real value.
     max-failed-logins-per-ip: 10000
     max-registrations-per-ip-per-hour: 10000
+    max-failed-logins-per-edge: 10000
+    max-registrations-per-edge-per-hour: 10000
 
 logging:
   level:

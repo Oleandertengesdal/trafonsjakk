@@ -51,6 +51,8 @@ Vercel proxies `/api/*` to Render, so the browser only ever talks to the Vercel 
    | `BOOTSTRAP_INVITE_CODE` | a long random phrase, e.g. from `openssl rand -base64 18`. You'll use it once. |
 
    `JWT_SECRET` is generated automatically by the blueprint (`generateValue: true`). `SPRING_PROFILES_ACTIVE=prod` is preset.
+
+   If `SPRING_PROFILES_ACTIVE=prod` is ever missing, the app falls back to its development settings. It then refuses to start rather than run on your Neon database with the public development JWT secret, and the Render log says which variable to fix.
 4. **Apply**. The first build takes a few minutes. When it's live, open `https://<your-service>.onrender.com/actuator/health` and expect `{"status":"UP"}`.
 
 <details>
@@ -84,6 +86,10 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 
 ## Step 6 (optional): Nice-to-haves
 
+- **Error alerts (Sentry, free plan):** create a project at sentry.io (platform: React). In its settings, turn on *Prevent Storing of IP Addresses*. Copy the DSN, add it in Vercel → Project → Settings → Environment Variables as `VITE_SENTRY_DSN` (Production), and redeploy. You then get an email when someone's browser crashes or the API returns a 500. The DSN isn't a secret (it ends up in the public JavaScript, as Sentry intends), but keep it out of Git anyway. Remove the variable and redeploy to switch it off.
+- **On the tablet or phones:** open the site and choose *Add to Home Screen* (Safari: the share button; Chrome: the menu or the install prompt). It then opens full screen like an app, and the screen stays on during live games.
+- **TV at the venue:** open `/tv` on the TV's browser (or a laptop on HDMI), log in once, and press the full-screen button. The browser stays logged in for up to 30 days of use.
+
 - **Custom domain:** add it in Vercel → Project → Domains. Nothing changes on Render.
 - **Avoid cold starts on chess night:** enable `.github/workflows/keep-warm.yml` (instructions inside). One always-on free instance uses about 744 of the 750 monthly hours, so only do this for one service.
 - **Backups:** Neon keeps a short restore window on the free plan. For peace of mind, run a periodic `pg_dump` from your own machine:
@@ -108,6 +114,7 @@ Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter`
 |---|---|
 | First visit after the API slept | The page shows skeletons while queries retry for up to about 50 s. Render wakes in roughly a minute; refresh if it takes longer. |
 | Pending games while everything sleeps | Auto-confirm (48 h) runs on a schedule, on startup and before reads, so overdue games are confirmed the next time anyone opens the app. |
+| Engine analysis | Nothing to set up: Vercel serves `frontend/public/engine` (Stockfish, about 7 MB) as static files with a one-year cache (`vercel.json`), and the work happens in each user's browser. |
 | Monthly awards while everything sleeps | A month is decided 3 days after it ends, hourly, on startup and before anyone reads the awards, so a sleeping server catches up the next time someone opens the app. Months are counted in Norwegian time (`app.awards.zone`). |
 | Need to fix ratings | Admin → **Recompute ratings** replays every confirmed game. This is safe to run at any time. |
 | Rotate `JWT_SECRET` | Change it in Render. Everyone is logged out once; nothing else is affected. |

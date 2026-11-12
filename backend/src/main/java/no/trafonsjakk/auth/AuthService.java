@@ -2,9 +2,12 @@ package no.trafonsjakk.auth;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
 import no.trafonsjakk.common.ApiException;
+import no.trafonsjakk.common.ClientAddress;
 import no.trafonsjakk.common.Tokens;
 import no.trafonsjakk.config.AppProperties;
+import no.trafonsjakk.user.AccountService;
 import no.trafonsjakk.user.Role;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserRepository;
@@ -42,7 +45,7 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenService.IssuedTokens login(String username, String password, String ip) {
+    public TokenService.IssuedTokens login(String username, String password, ClientAddress ip) {
         attempts.assertLoginAllowed(username, ip);
         User user = users.findByUsernameIgnoreCase(username.trim()).orElse(null);
         String hash = user != null ? user.getPasswordHash() : dummyHash;
@@ -59,7 +62,7 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenService.IssuedTokens register(AuthDtos.RegisterRequest req, String ip) {
+    public TokenService.IssuedTokens register(AuthDtos.RegisterRequest req, ClientAddress ip) {
         attempts.assertRegistrationAllowed(ip);
         assertPasswordFitsBcrypt(req.password());
 
@@ -76,7 +79,9 @@ public class AuthService {
         }
         // Only after the invite is known to be valid, so strangers can't probe which usernames exist.
         // (Nothing is consumed if this throws: the transaction rolls back.)
-        if (users.existsByUsernameIgnoreCase(username)) {
+        // deleted_<id> is what a deleted account is renamed to (AccountService), so it's never free to take
+        if (users.existsByUsernameIgnoreCase(username)
+                || username.toLowerCase(Locale.ROOT).startsWith(AccountService.DELETED_PREFIX)) {
             throw ApiException.conflict("auth.username_taken", "That username is taken");
         }
 

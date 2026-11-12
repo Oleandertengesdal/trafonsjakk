@@ -103,7 +103,7 @@ export function AdminPage() {
                         <span className="block text-[0.8125rem] text-muted">
                           {u.username}
                           {u.role === 'ADMIN' && `, ${t.common.admin}`}
-                          {!u.enabled && a.disabledSuffix}
+                          {u.deleted ? a.deletedSuffix : !u.enabled && a.disabledSuffix}
                         </span>
                       </td>
                       <td className="hidden px-3 py-3 text-muted sm:table-cell">{f.date(u.createdAt)}</td>
@@ -112,7 +112,7 @@ export function AdminPage() {
                         <div className="flex justify-end gap-2">
                           {u.id === me!.id ? (
                             <span className="text-[0.8125rem] text-faint">{t.common.you}</span>
-                          ) : (
+                          ) : u.deleted ? null : (
                             <>
                               <Button size="sm" variant="ghost" disabled={pending} onClick={() => updateUser.mutate({ id: u.id, body: { role: u.role === 'ADMIN' ? 'USER' : 'ADMIN' } })}>
                                 {u.role === 'ADMIN' ? a.removeAdmin : a.makeAdmin}

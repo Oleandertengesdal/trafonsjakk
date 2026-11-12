@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound } from 'lucide-react'
+import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound } from 'lucide-react'
 import { gamesApi } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthProvider'
 import { useI18n } from '../../i18n/I18nProvider'
@@ -29,6 +29,7 @@ export function AppShell() {
     { to: '/games', label: t.nav.games, icon: ListOrdered },
     { to: '/leaderboard', label: t.nav.ratings, icon: TrendingUp },
     { to: '/tournaments', label: t.nav.tournaments, icon: Trophy },
+    { to: '/live', label: t.nav.live, icon: Radio },
   ]
   const secondaryNav: NavItem[] = [
     { to: `/players/${me.username}`, label: t.nav.myProfile, icon: UserRound },
@@ -102,7 +103,8 @@ export function AppShell() {
           <Wordmark className="text-lg" />
         </Link>
         <AccountMenu label={t.nav.accountMenu}>
-          {secondaryNav.map((item) => (
+          {/* The tab bar only has room for four; the rest live here */}
+          {[...primaryNav.slice(4), ...secondaryNav].map((item) => (
             <Link key={item.to} to={item.to} className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-raised">
               <item.icon aria-hidden className="size-4.5 text-muted" />
               {item.label}

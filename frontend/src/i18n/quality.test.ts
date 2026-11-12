@@ -19,7 +19,7 @@ const all = leaves(en, nb)
 // (proper names, the ECO code system, and words Norwegian uses as-is: admin, rating, score, form, format, kudos)
 const SAME_IN_BOTH = new Set([
   'appName', 'language.nb', 'language.en', 'logGame.eco', 'common.admin', 'nav.admin', 'gameDetail.adminTitle', 'admin.title',
-  'leaderboard.rating', 'awards.rating', 'leaderboard.score', 'profile.score', 'profile.form', 'tournamentNew.format', 'social.kudos',
+  'leaderboard.rating', 'awards.rating', 'year.rating', 'year.sRating', 'year.groupIntro', 'leaderboard.score', 'profile.score', 'profile.form', 'tournamentNew.format', 'social.kudos',
 ])
 
 describe('dictionaries', () => {

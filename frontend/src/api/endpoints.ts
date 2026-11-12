@@ -10,13 +10,16 @@ import type {
   GameContext,
   GameResult,
   GameStatus,
+  GroupYear,
   Invite,
   Kudos,
   LeaderboardRow,
+  LiveGame,
   Me,
   MyMatch,
   Page,
   PlayerRef,
+  PlayerYear,
   Profile,
   Role,
   Stats,
@@ -49,6 +52,9 @@ export const usersApi = {
   updateMe: (realName: string) => api<Me>('/api/users/me', { method: 'PATCH', body: json({ realName }) }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api<void>('/api/users/me/password', { method: 'POST', body: json({ currentPassword, newPassword }) }),
+  /** Everything stored about you. */
+  exportData: () => api<Record<string, unknown>>('/api/users/me/export'),
+  deleteAccount: (password: string) => api<void>('/api/users/me/delete', { method: 'POST', body: json({ password }) }),
 }
 
 export interface NewGame {
@@ -112,6 +118,11 @@ export const awardsApi = {
   list: (player?: string) => api<Award[]>(`/api/awards${player ? `?player=${encodeURIComponent(player)}` : ''}`),
 }
 
+export const yearApi = {
+  group: (year: number) => api<GroupYear>(`/api/year/${year}`),
+  player: (year: number, username: string) => api<PlayerYear>(`/api/year/${year}/players/${encodeURIComponent(username)}`),
+}
+
 export const tournamentsApi = {
   list: () => api<TournamentSummary[]>('/api/tournaments'),
   get: (id: number) => api<TournamentDetail>(`/api/tournaments/${id}`),
@@ -143,4 +154,16 @@ export const adminApi = {
     api<{ token: string; expiresAt: string }>(`/api/admin/users/${userId}/password-reset`, { method: 'POST' }),
   recompute: () =>
     api<{ games: number; players: number; millis: number }>('/api/admin/ratings/recompute', { method: 'POST' }),
+}
+
+export const liveApi = {
+  running: () => api<LiveGame[]>('/api/live'),
+  get: (id: number) => api<LiveGame>(`/api/live/${id}`),
+  start: (whiteId: number, blackId: number) => api<LiveGame>('/api/live', { method: 'POST', body: json({ whiteId, blackId }) }),
+  /** Refused with `live.out_of_date` if someone saved since `version`. */
+  saveMoves: (id: number, moves: string | null, version: number) =>
+    api<LiveGame>(`/api/live/${id}/moves`, { method: 'PUT', body: json({ moves, version }) }),
+  /** Logs the result as an ordinary game for the opponent to confirm. */
+  finish: (id: number, result: GameResult) => api<Game>(`/api/live/${id}/finish`, { method: 'POST', body: json({ result }) }),
+  abandon: (id: number) => api<void>(`/api/live/${id}/abandon`, { method: 'POST' }),
 }

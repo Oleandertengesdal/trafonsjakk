@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowLeftRight, ListOrdered, Trophy } from 'lucide-react'
+import { ArrowLeftRight, ListOrdered, Radio, Trophy } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { gamesApi, tournamentsApi, usersApi } from '../api/endpoints'
 import { invalidateResults } from '../api/queryClient'
@@ -126,6 +126,16 @@ export function LogGamePage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader title={l.title} description={l.description} />
+
+      {matchId === null && (
+        <p className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.9375rem] text-muted">
+          <Radio aria-hidden className="size-4 text-accent" />
+          {l.liveHint}
+          <Link to="/live" className="font-medium text-accent underline-offset-4 hover:underline">
+            {l.liveLink}
+          </Link>
+        </p>
+      )}
 
       {matchId !== null && !myMatches.isPending && !match && (
         <p role="alert" className="mb-5 rounded-control border border-line bg-surface px-4 py-3 text-[0.9375rem] text-muted">

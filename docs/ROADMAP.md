@@ -37,7 +37,7 @@ These were agreed before any code was written.
 - Flyway `V1__init.sql` (all tables, constraints, indexes)
 - Users, invite codes, bootstrap admin
 - Login/register/refresh/logout with JWT in HttpOnly cookies, refresh-token rotation with reuse detection
-- CSRF (double-submit cookie), login lockout, IP rate limits, security headers
+- CSRF (double-submit cookie), login lockout, IP rate limits, security headers, request size limit, startup check for development secrets
 
 ### Phase 2 — Games & ratings ✅
 - Log / confirm / dispute / withdraw / admin resolve
@@ -72,9 +72,9 @@ These were agreed before any code was written.
 
 | Part | Verified |
 |---|---|
-| Domain logic (Glicko-2, round-robin, knockout, standings, stats, monthly awards) | ✅ Unit tests. Glicko-2 matches Glickman's published example (1464.06 / 151.52 / 0.05999). Round-robin colours are checked for every field size up to 32: balanced, never three in a row, also across the two halves of a double round-robin. |
-| Spring wiring, security, database | ✅ 308 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency); multi-use invite codes (including six people racing for three places), password reset links, comments (replies, likes, deleted threads), kudos, adding moves, the game context (expected score, upsets, head-to-head) and monthly awards (the rules, tie-breaks, Norwegian month boundaries, each month decided exactly once even with simultaneous readers, decided months that don't change afterwards). |
-| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 252 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian), the move recorder (tap moves, illegal taps, promotion, undo, typed/pasted PGN with the first illegal move pointed out, checkmate vs. result), comments (threads, replies, likes, Ctrl+Enter), the replay viewer and its move statistics, the game context panel, player of the month (home card, standings, profile badges), kudos, invites and the password reset page. A 57-step browser test against a mock API also passed in both languages. |
+| Domain logic (Glicko-2, round-robin, knockout, standings, stats, monthly awards, year in review, move judgements) | ✅ Unit tests. Glicko-2 matches Glickman's published example (1464.06 / 151.52 / 0.05999). Round-robin colours are checked for every field size up to 32: balanced, never three in a row, also across the two halves of a double round-robin. |
+| Spring wiring, security, database | ✅ 349 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion (including faked forwarding headers), oversized requests, password guessing through the change-password form, starting with development secrets, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency); multi-use invite codes (including six people racing for three places), password reset links, comments (replies, likes, deleted threads), kudos, adding moves, the game context (expected score, upsets, head-to-head) and monthly awards (the rules, tie-breaks, Norwegian month boundaries, each month decided exactly once even with simultaneous readers, decided months that don't change afterwards) the year in review (every highlight, Norwegian year boundaries, empty years), live games (recording, two phones saving at once, finishing into a normal game, idle games) and your own data (export, account deletion with its lockout, the last admin, anonymised games). |
+| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 303 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian), the move recorder (tap moves, illegal taps, promotion, undo, typed/pasted PGN with the first illegal move pointed out, checkmate vs. result), comments (threads, replies, likes, Ctrl+Enter), the replay viewer and its move statistics, the game context panel, player of the month (home card, standings, profile badges), the year-in-review stories (cards, navigation, sharing, the December banner), engine analysis (UCI parsing, mate handling, move judgements, accuracy, caching, stopping, a failing engine), kudos, invites, the password reset page, live games (saving every move, taking the other phone's moves, following, logging the result), downloading your data and deleting your account, the screen wake lock, error-report scrubbing and the app manifest. A 57-step browser test against a mock API also passed in both languages. |
 
 ### Bugs found by the tests (fixed)
 
@@ -98,6 +98,14 @@ Second round (security, races, limits):
 - An empty ECO code was rejected although the API treats it as "none".
 - **Frontend:** a sleeping server (free hosting) sent logged-in users to the login page; logging out while offline left an unhandled error; the login page could dead-end on a malformed return address.
 
+Security review (November 2026, after going live):
+
+- **Per-IP limits could be dodged.** With `forward-headers-strategy: framework` the "client IP" was the leftmost `X-Forwarded-For` entry, which anyone calling the Render URL directly can set, so every guess could come from a new made-up address. Limits now use Render's `True-Client-IP` and the entry just before it (`ClientAddress`).
+- **No limit on request size:** a huge body to the public login endpoint was read into memory. Now refused over 128 KB.
+- **The current-password check on "change password" had no lockout**, so a stolen session could guess the password freely. It now shares the login lockout.
+- **Nothing stopped a production start with development secrets** if `SPRING_PROFILES_ACTIVE=prod` went missing; now the app refuses to start.
+- **Tomcat advisories (October 2026):** Spring Boot 4.1.1 → 4.1.2.
+
 ## Added after launch (from members' feedback)
 
 - Invite codes for several people (admin): own limit (1–500) and expiry (1 hour to 90 days).
@@ -106,11 +114,18 @@ Second round (security, races, limits):
 - Game page: replay the moves (buttons, arrow keys or tap a move) with move statistics; expected score, upsets and head-to-head before the game; replies and likes on comments.
 - Recording moves on a board or as text/PGN, checked for legality; moves can be added after the game is logged.
 - A "Found a problem?" page for reporting bugs by email.
+- Engine analysis in the browser (Stockfish 18, optional, only for games with moves): blunders, mistakes and inaccuracies with what was better, an evaluation graph and bar, the engine's move as an arrow, accuracy per player.
+- "Årets sjakk": a year in review for every player and for the group, as story cards that can be shared as images; on the home page in December and January.
+- Live games: record the moves on a phone while you play (or just start the game and tap the result), with others following the board. Saved after every move; two phones can't overwrite each other.
+- TV mode: a full-screen scoreboard for a big screen at the venue (live boards, ratings, latest results).
+- Installable app (PWA): home-screen icon, opens without the browser bar, screen stays on during live games and on the TV, a friendly page when offline.
+- Download your data and delete your account (your games stay, under "Slettet spiller").
+- Optional error alerts with Sentry (no personal data sent).
 - Player of the month: a monthly award for the most points over expectation (and one for the most games), decided 3 days after the month ends, with badges on the profile, this month's race on the home page and the full standings and earlier winners on the ratings page.
 
 ## Later ideas
 
-- **Engine analysis** of a recorded game (replay on the board is done)
+- Opening explorer: which openings the group plays and how they score
 - Nynorsk as a third language
 - Swiss-system tournaments
 - Push/e-mail notification when a game awaits your confirmation

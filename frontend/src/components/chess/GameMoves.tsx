@@ -80,6 +80,7 @@ export function GameMoves({ game }: { game: Game }) {
           {game.moves}
         </p>
       ) : null}
+      {game.canEditMoves && !game.moves && <p className="text-[0.9375rem] text-muted">{m.optionalHint}</p>}
       {game.canEditMoves && (
         <Button variant="secondary" size="sm" className="self-start" onClick={() => setEditing(true)}>
           {game.moves ? m.edit : m.add}

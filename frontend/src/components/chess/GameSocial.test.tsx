@@ -290,6 +290,14 @@ describe('GameMoves', () => {
     expect(screen.getByText('we played the italian')).toBeInTheDocument()
   })
 
+  it('tells players that moves are optional, and never nags anyone else', () => {
+    const { unmount } = wrap(<GameMoves game={pendingGame({ moves: null, canEditMoves: true })} />)
+    expect(screen.getByText(en.moves.optionalHint)).toBeInTheDocument()
+    unmount()
+    wrap(<GameMoves game={pendingGame({ moves: '1. e4', canEditMoves: true })} />)
+    expect(screen.queryByText(en.moves.optionalHint)).not.toBeInTheDocument()
+  })
+
   it('lets a player add the moves on the board and saves them', async () => {
     vi.mocked(gamesApi.updateMoves).mockResolvedValue(pendingGame({ moves: '1. e4' }))
     const { container } = wrap(<GameMoves game={pendingGame({ status: 'CONFIRMED', moves: null, canEditMoves: true })} />)

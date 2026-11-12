@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F4EEE3" />
+    <title>Trafonsjakk – frakoblet</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { margin: 0; min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+        background: #f4eee3; color: #23252a; font: 17px/1.5 system-ui, sans-serif; }
+      main { max-width: 26rem; }
+      h1 { font-size: 1.5rem; line-height: 1.2; margin: 0 0 0.5rem; }
+      p { margin: 0 0 1rem; color: #645d55; }
+      a { display: inline-block; padding: 0.6rem 1rem; border-radius: 10px; background: #c23a2e; color: #fff9f2; font-weight: 600; text-decoration: none; }
+      @media (prefers-color-scheme: dark) { body { background: #17181b; color: #f2ebdf; } p { color: #b3aa9d; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Ingen nettforbindelse</h1>
+      <p>Trafonsjakk trenger nett. Sjekk tilkoblingen og prøv igjen.</p>
+      <p lang="en">You're offline. Trafonsjakk needs a connection.</p>
+      <a href="/">Prøv igjen</a>
+    </main>
+  </body>
+</html>

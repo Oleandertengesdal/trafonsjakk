@@ -10,7 +10,8 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 
 - **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
 - **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
-- **Comments and kudos** on every game.
+- **The game page:** replay the moves on a board (buttons, arrow keys or tap a move) with move statistics, see each side's expected score before the game, upsets and the head-to-head, give kudos and comment, with replies and likes.
+- **Player of the month:** a monthly award for whoever beat their rating's expectations the most (so the underdog can win, not just the strongest), plus one for the most active player. Winners get a badge on their profile, and the home page shows this month's race.
 - **Opponent confirmation.** A result counts once the other player confirms it, or automatically after 48 hours. Disputes go to an admin.
 - **Glicko-2 ratings**, updated after every confirmed game, with a rating deviation (±) and provisional "?" for new players. Ratings are always rebuilt from the game history, so late, corrected or voided results never leave them wrong.
 - **Tournaments**
@@ -76,7 +77,7 @@ This repository contains **no secrets**. Production values (`JWT_SECRET`, databa
 ## Project structure
 
 ```
-backend/     Spring Boot API (feature packages: auth, game, rating, tournament, stats, …)
+backend/     Spring Boot API (feature packages: auth, game, social, rating, award, tournament, stats, …)
 frontend/    React SPA (api client, design-system components, pages)
 docs/        Architecture, API, security, development and deployment guides
 ```

@@ -8,6 +8,8 @@ export function makeFormatters(lang: 'nb' | 'en') {
   const shortDate = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' })
   const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' })
   const month = new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' })
+  const monthYear = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const oneDecimal = new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const narrowMonth = new Intl.DateTimeFormat(locale, { month: 'narrow', timeZone: 'UTC' })
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
   const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 })
@@ -20,6 +22,14 @@ export function makeFormatters(lang: 'nb' | 'en') {
     dateTime: (iso: string) => `${date.format(new Date(iso))}, ${time.format(new Date(iso))}`,
     /** "2026-03" → "mars" / "March" */
     month: (yyyyMm: string) => month.format(new Date(`${yyyyMm}-01T00:00:00Z`)),
+    /** "2026-03" → "mars 2026" / "March 2026" */
+    monthYear: (yyyyMm: string) => monthYear.format(new Date(`${yyyyMm}-01T00:00:00Z`)),
+    /** One decimal with a real minus sign: +1,9 / −0,4 / ±0,0 */
+    signedDecimal: (v: number) => {
+      const r = Math.round(v * 10) / 10
+      const s = oneDecimal.format(Math.abs(r))
+      return r > 0 ? `+${s}` : r < 0 ? `−${s}` : `±${s}`
+    },
     monthInitial: (yyyyMm: string) => narrowMonth.format(new Date(`${yyyyMm}-01T00:00:00Z`)).toUpperCase(),
     relative: (iso: string, now = Date.now()) => {
       const diff = new Date(iso).getTime() - now
@@ -31,6 +41,8 @@ export function makeFormatters(lang: 'nb' | 'en') {
     },
     pct: (v: number) => percent.format(v),
     decimal: (v: number) => decimal.format(v),
+    /** Always one decimal: 1,5 / 0,9 / 1,0 */
+    decimal1: (v: number) => oneDecimal.format(v),
   }
 }
 

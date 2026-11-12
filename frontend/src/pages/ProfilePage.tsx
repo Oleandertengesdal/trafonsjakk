@@ -5,6 +5,7 @@ import { Crown, Flame, Skull, Swords, Target, Trophy } from 'lucide-react'
 import { ApiError } from '../api/client'
 import { gamesApi, usersApi } from '../api/endpoints'
 import type { Stats, Tally } from '../api/types'
+import { AwardBadges } from '../components/awards/AwardBadges'
 import { ActivityBars } from '../components/chess/ActivityBars'
 import { Avatar } from '../components/chess/Avatar'
 import { GameRow } from '../components/chess/GameRow'
@@ -77,6 +78,8 @@ export function ProfilePage() {
           </div>
         </div>
       </section>
+
+      <AwardBadges username={p.username} />
 
       {!played ? (
         <Panel>

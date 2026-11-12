@@ -64,7 +64,7 @@ These were agreed before any code was written.
 
 ### Phase 6 — Ship
 - [ ] Generate the Maven wrapper (`mvn -N wrapper:wrapper`) and commit it
-- [ ] Create Neon DB → Render service → Vercel project ([DEPLOYMENT.md](DEPLOYMENT.md))
+- [x] Create Neon DB → Render service → Vercel project ([DEPLOYMENT.md](DEPLOYMENT.md)): live
 - [ ] Create the bootstrap admin, then remove `BOOTSTRAP_INVITE_CODE`
 - [ ] Invite the group
 
@@ -72,9 +72,9 @@ These were agreed before any code was written.
 
 | Part | Verified |
 |---|---|
-| Domain logic (Glicko-2, round-robin, knockout, standings, stats) | ✅ Unit tests. Glicko-2 matches Glickman's published example (1464.06 / 151.52 / 0.05999). Round-robin colours are checked for every field size up to 32: balanced, never three in a row, also across the two halves of a double round-robin. |
-| Spring wiring, security, database | ✅ 288 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency); multi-use invite codes (including six people racing for three places), password reset links, comments (replies, likes, deleted threads), kudos, adding moves and the game context (expected score, upsets, head-to-head). |
-| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 237 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian), the move recorder (tap moves, illegal taps, promotion, undo, typed/pasted PGN with the first illegal move pointed out, checkmate vs. result), comments (threads, replies, likes, Ctrl+Enter), the replay viewer and its move statistics, the game context panel, kudos, invites and the password reset page. A 57-step browser test against a mock API also passed in both languages. |
+| Domain logic (Glicko-2, round-robin, knockout, standings, stats, monthly awards) | ✅ Unit tests. Glicko-2 matches Glickman's published example (1464.06 / 151.52 / 0.05999). Round-robin colours are checked for every field size up to 32: balanced, never three in a row, also across the two halves of a double round-robin. |
+| Spring wiring, security, database | ✅ 308 backend tests. API tests run the real app against PostgreSQL: the auth, game, tournament, invite and admin flows; **attacks** (forged, unsigned, expired and self-promoted tokens, stolen sessions, CSRF, user enumeration, lockout evasion, over-posting, CORS, actuator, malformed and hostile input, an authorisation check of every endpoint); **limits** on every field, both sides of the boundary; **races** (double clicks, two tabs, two people at once); complete randomized **tournaments** of 2–32 players checked against bracket and table invariants; and **ratings** (leaderboard, provisional players, inactivity, peak, recompute consistency); multi-use invite codes (including six people racing for three places), password reset links, comments (replies, likes, deleted threads), kudos, adding moves, the game context (expected score, upsets, head-to-head) and monthly awards (the rules, tie-breaks, Norwegian month boundaries, each month decided exactly once even with simultaneous readers, decided months that don't change afterwards). |
+| Frontend | ✅ typecheck, lint, `check:i18n`, production build and 252 Vitest tests: API client, session handling (incl. a sleeping server), route guards, login redirect safety, the log-game form, game actions, registration, safe rendering of user text, deployment headers (`vercel.json`, `index.html`), translation completeness (every backend error code; no English left in Norwegian), the move recorder (tap moves, illegal taps, promotion, undo, typed/pasted PGN with the first illegal move pointed out, checkmate vs. result), comments (threads, replies, likes, Ctrl+Enter), the replay viewer and its move statistics, the game context panel, player of the month (home card, standings, profile badges), kudos, invites and the password reset page. A 57-step browser test against a mock API also passed in both languages. |
 
 ### Bugs found by the tests (fixed)
 
@@ -106,13 +106,14 @@ Second round (security, races, limits):
 - Game page: replay the moves (buttons, arrow keys or tap a move) with move statistics; expected score, upsets and head-to-head before the game; replies and likes on comments.
 - Recording moves on a board or as text/PGN, checked for legality; moves can be added after the game is logged.
 - A "Found a problem?" page for reporting bugs by email.
+- Player of the month: a monthly award for the most points over expectation (and one for the most games), decided 3 days after the month ends, with badges on the profile, this month's race on the home page and the full standings and earlier winners on the ratings page.
 
 ## Later ideas
 
-- **Replay and analysis on the board:** step through a game's moves (the stored moves are already validated PGN, and the board component is in place), then perhaps an engine evaluation
+- **Engine analysis** of a recorded game (replay on the board is done)
 - Nynorsk as a third language
 - Swiss-system tournaments
 - Push/e-mail notification when a game awaits your confirmation
 - Separate rating pools per time control (blitz/rapid/classical)
 - Season resets / yearly leaderboards
-- Achievements ("Giant slayer": beat someone 200+ above you)
+- More badges next to player of the month ("Giant slayer": beat someone 200+ above you)

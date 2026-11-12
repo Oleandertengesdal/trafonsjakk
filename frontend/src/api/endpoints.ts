@@ -1,6 +1,8 @@
 import { api, json } from './client'
 import type {
   AdminUser,
+  Award,
+  AwardRace,
   CommentLikes,
   CreatedInvite,
   Game,
@@ -101,6 +103,13 @@ export const socialApi = {
 
 export const leaderboardApi = {
   get: () => api<LeaderboardRow[]>('/api/leaderboard'),
+}
+
+export const awardsApi = {
+  /** Standings for a month ("2026-10"); this month when left out. */
+  race: (month?: string) => api<AwardRace>(`/api/awards/race${month ? `?month=${encodeURIComponent(month)}` : ''}`),
+  /** Awards that were won, newest first; one person's with `player`. */
+  list: (player?: string) => api<Award[]>(`/api/awards${player ? `?player=${encodeURIComponent(player)}` : ''}`),
 }
 
 export const tournamentsApi = {

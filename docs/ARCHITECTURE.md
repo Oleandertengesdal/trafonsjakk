@@ -63,6 +63,14 @@ erDiagram
     USERS ||--o{ TOURNAMENT_PARTICIPANTS : joins
     TOURNAMENTS ||--|{ TOURNAMENT_MATCHES : contains
     TOURNAMENT_MATCHES ||--o{ GAMES : "decided by"
+    INVITE_CODES ||--o{ INVITE_REDEMPTIONS : "used by"
+    USERS ||--o| INVITE_REDEMPTIONS : "joined with"
+    USERS ||--o{ PASSWORD_RESET_TOKENS : has
+    GAMES ||--o{ GAME_COMMENTS : has
+    GAME_COMMENTS ||--o{ GAME_COMMENTS : "replies"
+    GAME_COMMENTS ||--o{ COMMENT_LIKES : has
+    GAMES ||--o{ GAME_KUDOS : has
+    USERS ||--o{ MONTHLY_AWARDS : wins
 
     USERS {
         bigint id PK
@@ -109,9 +117,52 @@ erDiagram
         varchar code_hash "SHA-256, unique"
         bigint created_by FK
         timestamptz expires_at
-        bigint used_by FK
+        int max_uses "1-500"
+        int use_count
+        timestamptz revoked_at
+    }
+    INVITE_REDEMPTIONS {
+        bigint id PK
+        bigint invite_id FK
+        bigint user_id FK "unique"
+        timestamptz used_at
+    }
+    PASSWORD_RESET_TOKENS {
+        bigint id PK
+        bigint user_id FK
+        varchar token_hash "SHA-256, unique"
+        bigint created_by FK
+        timestamptz expires_at
         timestamptz used_at
         timestamptz revoked_at
+    }
+    GAME_COMMENTS {
+        bigint id PK
+        bigint game_id FK
+        bigint author_id FK
+        bigint parent_id FK "thread's first comment"
+        bigint reply_to_user_id FK
+        varchar body "max 1000"
+        timestamptz edited_at
+        timestamptz deleted_at "kept for its replies"
+    }
+    COMMENT_LIKES {
+        bigint comment_id PK,FK
+        bigint user_id PK,FK
+    }
+    GAME_KUDOS {
+        bigint game_id PK,FK
+        bigint user_id PK,FK
+    }
+    MONTHLY_AWARDS {
+        date month PK "first day"
+        varchar kind PK "PLAYER_OF_MONTH | MOST_ACTIVE"
+        bigint user_id FK "null = nobody qualified"
+        int games
+        float points
+        float expected
+        float rating_change
+        timestamptz decided_at
     }
     REFRESH_TOKENS {
         bigint id PK
@@ -159,9 +210,11 @@ erDiagram
 | `CHECK (white_id <> black_id)`, `CHECK` constraints on all enum columns | The database rejects impossible data even if a bug slips through. |
 | Partial unique index: one *open* (`PENDING`/`DISPUTED`) game per tournament match | Prevents two people logging the same tournament game at once. |
 | `version` columns on `games`, `tournaments`, `tournament_matches` | Optimistic locking: two simultaneous confirmations can't both win. |
+| Likes and kudos have a composite primary key and are inserted with `on conflict do nothing` | One per person, so double taps can't inflate counts. |
+| `monthly_awards` rows are written once and never updated | A decided month stays decided, even if an old game is corrected later (see §3.7). |
 | Indexes on `(white_id, played_at)`, `(black_id, played_at)`, `(status, created_at)`, `(user_id, played_at)` on history | Profile pages, auto-confirm sweep and rating graphs are all index scans. |
 
-The full DDL lives in [`V1__init.sql`](../backend/src/main/resources/db/migration/V1__init.sql).
+The full DDL is in the Flyway migrations: [`V1__init.sql`](../backend/src/main/resources/db/migration/V1__init.sql) (core tables), `V2` (multi-use invites, password links, comments, kudos), `V3` (comment replies and likes) and `V4` (monthly awards).
 
 ---
 
@@ -176,31 +229,38 @@ The full DDL lives in [`V1__init.sql`](../backend/src/main/resources/db/migratio
 | Persistence | Spring Data JPA (Hibernate 7), Flyway, PostgreSQL driver |
 | Security | Spring Security 7, Nimbus JOSE (HS256 signing and validation) via a cookie filter (`CookieJwtAuthenticationFilter`), BCrypt |
 | Caching / rate limits | Caffeine (in-memory; single instance) |
-| Tests | JUnit 5 (pure unit tests for the algorithm classes) |
+| Tests | JUnit 6: unit tests for the algorithm classes, and API tests that run the whole app against PostgreSQL |
 
 ### 3.2 Package layout (feature-first)
 
 ```
 no.trafonsjakk
 ├── TrafonsjakkApplication
-├── config/        SecurityConfig, JwtConfig, AppProperties, SpaCsrfTokenRequestHandler
-├── common/        ApiException, GlobalExceptionHandler (RFC 7807), ClientIp
+├── config/        SecurityConfig, JwtConfig, AppProperties, SpaCsrfTokenRequestHandler,
+│                  CookieJwtAuthenticationFilter, ControlCharacterFilter, ProblemWriter
+├── common/        ApiException, GlobalExceptionHandler (RFC 7807), CurrentUser, Tokens,
+│                  validation/PlainText
 ├── auth/          AuthController, AuthService, TokenService, AuthCookies,
 │                  LoginAttemptService, RefreshToken(+Repository),
-│                  InviteCode(+Repository), InviteService, InviteController
-├── user/          User, Role, UserRepository, UserService, UserController
-├── game/          Game, GameResult, GameStatus, GameRepository, GameService,
-│                  GameController, AutoConfirmScheduler
+│                  InviteCode, InviteRedemption (+Repositories), InviteService, InviteController,
+│                  PasswordResetToken(+Repository), PasswordResetService
+├── user/          User, Role, PlayerRef, UserRepository, UserService, UserController
+│                  (profile and statistics endpoints)
+├── game/          Game, GameResult, GameStatus, GameRepository, GameService, GameMapper,
+│                  GameController, AutoConfirmService, GameContextService
+├── social/        GameComment(+Repository), CommentLikeRepository, KudosRepository,
+│                  SocialService, SocialController
 ├── rating/        Glicko2 (pure math), RatingHistory(+Repository),
-│                  RatingService (recompute), LeaderboardController
+│                  RatingService (recompute), LeaderboardService, LeaderboardController
+├── award/         MonthlyAwardCalculator (pure), AwardRepository, AwardService, AwardController
 ├── tournament/    Tournament, TournamentMatch, TournamentParticipant, enums,
 │                  repositories, TournamentService, TournamentController,
 │                  RoundRobinScheduler, KnockoutBracket, StandingsCalculator (pure)
-├── stats/         PlayerStatsCalculator (pure), StatsService, StatsController
+├── stats/         PlayerStatsCalculator (pure), StatsService
 └── admin/         AdminController
 ```
 
-Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
+Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
 
 ### 3.3 Game lifecycle (opponent confirmation)
 
@@ -221,7 +281,7 @@ stateDiagram-v2
 - Only the two players (or an admin) may log a game.
 - If a player logged it, **the other player** confirms. If an admin logged it on behalf of two others, **either** player may confirm.
 - Only `CONFIRMED` games affect ratings, statistics and tournaments.
-- **Auto-confirm:** a scheduled job runs every 10 minutes and confirms `PENDING` games older than 48 h. Free hosting sleeps when idle, so the same sweep also runs on startup and before game, leaderboard and profile reads. That makes it correct even if the scheduler never fired.
+- **Auto-confirm:** a scheduled job runs every 10 minutes and confirms `PENDING` games older than 48 h. Free hosting sleeps when idle, so the same sweep also runs on startup and before game, leaderboard, profile, tournament and awards reads. That makes it correct even if the scheduler never fired.
 
 ### 3.4 Rating engine: Glicko-2
 
@@ -297,13 +357,23 @@ For a friend group (hundreds to a few thousand games) this takes milliseconds. I
 - most-played opening, recent form (last 10), games per month (last 12 months),
 - tournament wins.
 
-### 3.7 Error format
+### 3.7 Monthly awards ("Månedens spiller")
 
-All errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) `application/problem+json`:
+Two awards per calendar month (Norwegian time), from confirmed games only:
+
+- **Player of the month:** the most *points over expectation*: for each game, the score (1, ½, 0) minus Glicko-2's expected score at both players' pre-game ratings (taken from `rating_history`, the same numbers as the game page). The underdog who beats stronger players wins, not simply the highest-rated player, and every extra game counts if it's played well. Summed over everyone it's zero. At least 3 games and a positive total; ties go to more games, then the bigger rating gain, then the older account.
+- **Most active:** the most games (at least 3); ties go to the better performance.
+
+`MonthlyAwardCalculator` holds these rules as pure functions. `AwardService` computes standings on the fly for any month, and *decides* a month 3 days after it ends (so late confirmations count): it inserts one row per award into `monthly_awards` with `on conflict do nothing`, and never updates it. Deciding runs hourly, on startup and before every awards read (the same "free hosting sleeps" reasoning as auto-confirm), and catches up on every finished month that isn't decided yet. The zone, grace period and minimum are `app.awards.*` settings.
+
+### 3.8 Error format
+
+All errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) `application/problem+json` with a stable `code` that the frontend translates (see [API.md](API.md)):
 
 ```json
-{ "type": "about:blank", "title": "Bad Request", "status": 400,
-  "detail": "Validation failed", "errors": { "username": "must match ^[A-Za-z0-9_]{3,20}$" } }
+{ "type": "about:blank", "title": "Bad Request", "status": 400, "detail": "Validation failed",
+  "code": "validation", "errors": { "username": "3–20 characters: letters, digits and underscore" },
+  "errorCodes": { "username": "Pattern" } }
 ```
 
 Stack traces and SQL never reach the client.
@@ -330,18 +400,20 @@ Stack traces and SQL never reach the client.
 | Path | Page | Access |
 |---|---|---|
 | `/login`, `/register` | Auth (register requires invite code) | public |
-| `/` | Home: your rating card, pending confirmations, leaderboard top 5, recent games, active tournaments | member |
+| `/reset-password` | Choose a new password from an admin's one-time link | public |
+| `/feedback` | "Found a problem?": how to report a bug by email | public |
+| `/` | Home: your rating card, pending confirmations, tournament games to play, player of the month (last month's winners and this month's top three), latest games, top of the table, active tournaments | member |
 | `/log` | Log a game (optionally pre-filled from a tournament match) | member |
 | `/games` | All games, filter by player/status | member |
-| `/games/:id` | Game detail; confirm / dispute / withdraw | member |
-| `/leaderboard` | Ratings table | member |
-| `/players/:username` | Profile + statistics dashboard | member |
+| `/games/:id` | Game detail: confirm / dispute / withdraw, kudos, replay with move statistics, expected score / upset / head-to-head, moves, comments with replies and likes | member |
+| `/leaderboard` | Ratings table, and the monthly standings with earlier winners | member |
+| `/players/:username` | Profile + statistics dashboard, award badges | member |
 | `/tournaments` | List | member |
 | `/tournaments/new` | Create | member |
 | `/tournaments/:id` | Standings & fixtures (RR) or bracket (KO) | member |
 | `/invites` | Create / revoke invite codes | member |
 | `/settings` | Real name, password, language, light/dark | member |
-| `/admin` | Disputes, users (role/enable), recompute ratings | admin |
+| `/admin` | Disputes, users (role/enable, password links), recompute ratings | admin |
 
 ### 4.3 Component structure
 
@@ -356,13 +428,18 @@ src/
 │   ├── layout/                  AppShell (sidebar ≥ md, bottom tab bar on mobile), PageHeader
 │   ├── ui/                      Button/ButtonLink, Field/Input/Select/Textarea, Panel, Skeleton,
 │   │                            EmptyState, ErrorNotice, Dialog, Toast, Segmented, LanguageSwitch
-│   └── chess/                   Avatar, PlayerLink/Rating, ResultMark/RatingDelta/FormStrip, GameRow,
-│                                GameActions, AdminResolveControls, RatingChart, ActivityBars,
-│                                Crosstable, Bracket, PlayerSelect
+│   ├── chess/                   Avatar, PlayerLink/Rating, ResultMark/RatingDelta/FormStrip, GameRow,
+│   │                            GameActions, AdminResolveControls, RatingChart, ActivityBars,
+│   │                            Crosstable, Bracket, PlayerSelect, MoveRecorder, GameMoves,
+│   │                            GameViewer (replay + move statistics), GameContextPanel,
+│   │                            GameComments, KudosButton
+│   ├── awards/                  MonthlyAwardCard (home), AwardsPanel (ratings page), AwardBadges (profile)
+│   └── admin/                   ResetLinkButton
+├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts
 ├── pages/                       one file per route
 ├── i18n/                        en.ts, nb.ts (dictionaries), I18nProvider, format.ts (locale-aware
 │                                dates/numbers), rounds.ts, useErrorText.ts (server error codes → text)
-└── lib/                         cn.ts, theme.ts
+└── lib/                         cn.ts, theme.ts, gameResult.ts, safePath.ts, contact.ts
 ```
 
 ### 4.4 Visual language: the Trafon facade
@@ -376,7 +453,7 @@ The look is drawn from the Trafon building (a red-painted two-storey facade with
 | `brand` | `#C23A2E` (Trafon red) | `#C43C2F` | **fills** behind cream text: buttons, the brick hero, logo, selected states |
 | `accent` | `#B8352A` | `#EF6A5A` | red **text**, links, chart line, focus ring |
 | `win` / `loss` / `draw` | green / brick / slate | lighter variants | results, rating changes |
-| `gold` | `#8A6416` | `#D8AF5A` | "waiting for confirmation" |
+| `gold` | `#8A6416` | `#D8AF5A` | "waiting for confirmation", upsets and monthly awards |
 
 `brand` and `accent` are split so red text stays readable on dark backgrounds while red buttons keep enough contrast for cream labels. Every text/background pair was measured to be at least 4.5:1.
 

@@ -68,6 +68,11 @@ app:
   bootstrap-invite-code: ${BOOTSTRAP_INVITE_CODE:}
   games:
     auto-confirm-after: 48h
+  awards:
+    # Months follow Norwegian time. A month is decided this long after it ends, so late confirmations count.
+    zone: Europe/Oslo
+    decide-after: 3d
+    min-games: 3
   invites:
     ttl: 7d
     max-active-per-user: 5

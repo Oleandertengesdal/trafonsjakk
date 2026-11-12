@@ -212,6 +212,7 @@ class SecurityApiTest extends IntegrationTest {
                 new Call("PUT", "/api/games/1/kudos"), new Call("DELETE", "/api/games/1/kudos"),
                 new Call("GET", "/api/games/1/context"), new Call("PUT", "/api/games/1/comments/1/like"),
                 new Call("DELETE", "/api/games/1/comments/1/like"),
+                new Call("GET", "/api/awards"), new Call("GET", "/api/awards/race"),
                 new Call("GET", "/api/leaderboard"), new Call("GET", "/api/tournaments"),
                 new Call("POST", "/api/tournaments"), new Call("GET", "/api/tournaments/matches/mine"),
                 new Call("GET", "/api/tournaments/1"), new Call("PUT", "/api/tournaments/1/participants"),

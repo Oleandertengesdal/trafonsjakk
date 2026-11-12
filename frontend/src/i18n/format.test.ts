@@ -40,6 +40,20 @@ describe('makeFormatters', () => {
     expect(no.decimal(1.5)).toBe('1,5')
   })
 
+  it('names a month with its year, and points over expectation with one decimal', () => {
+    const no = makeFormatters('nb')
+    const gb = makeFormatters('en')
+    expect(no.monthYear('2026-10')).toBe('oktober 2026')
+    expect(gb.monthYear('2026-10')).toBe('October 2026')
+    expect(no.signedDecimal(1.94)).toBe('+1,9')
+    expect(gb.signedDecimal(1.96)).toBe('+2.0')
+    expect(gb.signedDecimal(-0.44)).toBe('−0.4')
+    expect(gb.signedDecimal(0.04)).toBe('±0.0')
+    expect(gb.signedDecimal(-0.04)).toBe('±0.0')
+    expect(no.decimal1(1)).toBe('1,0')
+    expect(gb.decimal1(1.46)).toBe('1.5')
+  })
+
   it('describes recent times relatively and older ones by date', () => {
     const now = Date.parse('2026-06-15T12:00:00Z')
     const gb = makeFormatters('en')

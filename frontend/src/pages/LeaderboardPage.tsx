@@ -1,7 +1,9 @@
-import { Link } from 'react-router'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { TrendingUp } from 'lucide-react'
-import { leaderboardApi } from '../api/endpoints'
+import { TrendingUp, Trophy } from 'lucide-react'
+import { awardsApi, leaderboardApi } from '../api/endpoints'
+import { AwardsPanel } from '../components/awards/AwardsPanel'
 import { Avatar } from '../components/chess/Avatar'
 import { Rating } from '../components/chess/PlayerLink'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -17,6 +19,14 @@ export function LeaderboardPage() {
   const { t, f } = useI18n()
   const lb = t.leaderboard
   const q = useQuery({ queryKey: ['leaderboard'], queryFn: leaderboardApi.get })
+  const awards = useQuery({ queryKey: ['awards', 'list', null], queryFn: () => awardsApi.list() })
+  const reigning = awards.data?.find((w) => w.kind === 'PLAYER_OF_MONTH')
+  const { hash } = useLocation()
+
+  // "See the standings" on the home page links to #awards
+  useEffect(() => {
+    if (hash === '#awards') document.getElementById('awards')?.scrollIntoView()
+  }, [hash])
 
   return (
     <>
@@ -53,7 +63,12 @@ export function LeaderboardPage() {
                       <Link to={`/players/${r.player.username}`} className="flex items-center gap-3 hover:text-accent">
                         <Avatar name={r.player.realName} seed={r.player.username} size="sm" />
                         <span className="min-w-0">
-                          <span className="block truncate font-medium">{r.player.realName}</span>
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <span className="truncate">{r.player.realName}</span>
+                            {reigning?.player.id === r.player.id && (
+                              <Trophy role="img" aria-label={t.awards.reigning(f.monthYear(reigning.month))} className="size-4 shrink-0 text-gold" />
+                            )}
+                          </span>
                           <span className="block truncate text-[0.8125rem] text-muted">{r.player.username}</span>
                         </span>
                       </Link>
@@ -77,6 +92,9 @@ export function LeaderboardPage() {
           </table>
         )}
       </Panel>
+      <div className="mt-6">
+        <AwardsPanel />
+      </div>
     </>
   )
 }

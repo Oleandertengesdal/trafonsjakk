@@ -100,7 +100,7 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 
 ## Updating
 
-Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter` in `render.yaml`); Vercel rebuilds the frontend. Flyway applies any new migrations on startup. Add new migrations as `V2__description.sql` and never edit an applied one.
+Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter` in `render.yaml`); Vercel rebuilds the frontend. Flyway applies any new migrations on startup. Add a new migration with the next number (`V5__description.sql` after `V4__monthly_awards.sql`) and never edit one that has been applied.
 
 ## Operating notes
 
@@ -108,6 +108,7 @@ Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter`
 |---|---|
 | First visit after the API slept | The page shows skeletons while queries retry for up to about 50 s. Render wakes in roughly a minute; refresh if it takes longer. |
 | Pending games while everything sleeps | Auto-confirm (48 h) runs on a schedule, on startup and before reads, so overdue games are confirmed the next time anyone opens the app. |
+| Monthly awards while everything sleeps | A month is decided 3 days after it ends, hourly, on startup and before anyone reads the awards, so a sleeping server catches up the next time someone opens the app. Months are counted in Norwegian time (`app.awards.zone`). |
 | Need to fix ratings | Admin → **Recompute ratings** replays every confirmed game. This is safe to run at any time. |
 | Rotate `JWT_SECRET` | Change it in Render. Everyone is logged out once; nothing else is affected. |
 | Leaked DB password | Reset it in Neon, update `DATABASE_PASSWORD` in Render. |

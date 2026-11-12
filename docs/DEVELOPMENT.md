@@ -66,7 +66,7 @@ CI runs all of this plus a gitleaks secret scan on every push (`.github/workflow
 
 | Kind | Where | Needs |
 |---|---|---|
-| Unit tests (Glicko-2, pairings, bracket, standings, stats, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,game,auth,common}` | nothing |
+| Unit tests (Glicko-2, pairings, bracket, standings, stats, monthly award rules, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,award,game,auth,common}` | nothing |
 | API tests: the real app on a random port, called over HTTP with cookies and CSRF like the browser | `src/test/java/no/trafonsjakk/api` | PostgreSQL |
 
 The API tests use the `test` profile (`src/test/resources/application-test.yml`). They run in their own schema, `trafonsjakk_test`, inside the Docker database, so they never touch your dev data, and they empty all tables before each test. Point them elsewhere with `TEST_DATABASE_URL` / `TEST_DATABASE_USERNAME` / `TEST_DATABASE_PASSWORD`.
@@ -75,8 +75,10 @@ If the database isn't running, the API tests are **skipped** with a hint, so `mv
 
 | API test class | What it covers |
 |---|---|
-| `AuthApiTest`, `InviteApiTest`, `AdminApiTest` | sign-up, login, cookies, refresh, invites, admin actions |
-| `GameApiTest`, `TournamentApiTest`, `RatingStatsApiTest` | features end to end |
+| `AuthApiTest`, `InviteApiTest`, `AdminApiTest`, `PasswordResetApiTest` | sign-up, login, cookies, refresh, invites, admin actions, password links |
+| `GameApiTest`, `TournamentApiTest`, `RatingStatsApiTest`, `GameContextApiTest` | features end to end |
+| `SocialApiTest`, `CommentThreadsApiTest` | comments, replies, likes, kudos |
+| `AwardsApiTest` | monthly awards: the rules, Norwegian month boundaries, deciding once, frozen results |
 | `SecurityApiTest`, `RateLimitApiTest` | attacks: forged tokens, stolen sessions, enumeration, over-posting, hostile input, every endpoint's access rules |
 | `InputLimitsApiTest` | every field limit on both sides of the boundary |
 | `ConcurrencyApiTest` | requests fired in parallel (double clicks, two tabs, two people) |
@@ -100,10 +102,12 @@ All visible text lives in `frontend/src/i18n/en.ts` and `nb.ts`. Add the key to 
 trafonsjakk/
 ├── backend/                 Spring Boot API
 │   ├── src/main/java/no/trafonsjakk/
-│   │   ├── auth/            login, register, JWT cookies, refresh tokens, invites, lockout
-│   │   ├── config/          security, JWT keys, typed properties, CSRF handler
-│   │   ├── game/            game logging + confirmation lifecycle, auto-confirm
+│   │   ├── auth/            login, register, JWT cookies, refresh tokens, invites, password links, lockout
+│   │   ├── config/          security, JWT cookie filter, typed properties, CSRF handler
+│   │   ├── game/            game logging + confirmation lifecycle, auto-confirm, game context
+│   │   ├── social/          comments (replies, likes) and kudos
 │   │   ├── rating/          Glicko-2 engine, recompute, leaderboard
+│   │   ├── award/           player of the month
 │   │   ├── tournament/      round-robin & knockout engines, standings
 │   │   ├── stats/           profile statistics
 │   │   ├── user/ admin/ common/
@@ -114,7 +118,9 @@ trafonsjakk/
 ├── frontend/                React + Vite + Tailwind
 │   ├── src/api/             fetch client (CSRF + refresh), endpoints, DTO types
 │   ├── src/auth/            session provider, route guards
-│   ├── src/components/      ui/ (design system), chess/ (domain widgets), layout/
+│   ├── src/components/      ui/ (design system), chess/ (domain widgets), awards/, admin/, brand/, layout/
+│   ├── src/chess/           move legality, PGN and move statistics (chess.js)
+│   ├── src/i18n/            Norwegian/English dictionaries and formatting
 │   ├── src/pages/           one file per route
 │   └── vercel.json          SPA routing, /api proxy, security headers
 ├── docs/                    architecture, API, security, deployment

@@ -111,6 +111,52 @@ export interface Page<T> {
   totalPages: number
 }
 
+export type AwardKind = 'PLAYER_OF_MONTH' | 'MOST_ACTIVE'
+
+/** A decided monthly award. `overExpected` = points − expected (from Glicko-2 before each game). */
+export interface Award {
+  /** "2026-10" */
+  month: string
+  kind: AwardKind
+  player: PlayerRef
+  games: number
+  points: number
+  expected: number
+  overExpected: number
+  ratingChange: number
+  decidedAt: string
+}
+
+export interface AwardStanding {
+  player: PlayerRef
+  games: number
+  wins: number
+  draws: number
+  losses: number
+  points: number
+  expected: number
+  overExpected: number
+  ratingChange: number
+  /** Played at least `minGames`. */
+  qualified: boolean
+}
+
+export interface AwardCategory {
+  /** Set once the month is decided and someone qualified. */
+  winner: Award | null
+  standings: AwardStanding[]
+}
+
+export interface AwardRace {
+  month: string
+  status: 'LIVE' | 'DECIDING' | 'DECIDED'
+  endsAt: string
+  decidesAt: string
+  minGames: number
+  playerOfMonth: AwardCategory
+  mostActive: AwardCategory
+}
+
 export interface LeaderboardRow {
   rank: number | null
   player: PlayerRef

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Clock, Swords, Trophy } from 'lucide-react'
 import { gamesApi, leaderboardApi, tournamentsApi, usersApi } from '../api/endpoints'
 import { useAuth } from '../auth/AuthProvider'
+import { MonthlyAwardCard } from '../components/awards/MonthlyAwardCard'
 import { TrafonFacade } from '../components/brand/TrafonFacade'
 import { Avatar } from '../components/chess/Avatar'
 import { GameActions } from '../components/chess/GameActions'
@@ -123,6 +124,8 @@ export function HomePage() {
           </ul>
         </Panel>
       )}
+
+      <MonthlyAwardCard />
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Panel

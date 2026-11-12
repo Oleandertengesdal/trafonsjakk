@@ -57,7 +57,7 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/users` | All active players (for pickers) → `PlayerRef[]` |
-| GET | `/users/{username}` | `Profile` = `PlayerRef + { role, rank, memberSince, ratedGames }` |
+| GET | `/users/{username}` | `Profile` = `PlayerRef + { role, rank, memberSince, ratedGames, peakRating }` |
 | GET | `/users/{username}/stats` | Statistics dashboard payload (see below) |
 | PATCH | `/users/me` | `{ realName }` |
 | POST | `/users/me/password` | `{ currentPassword, newPassword }`, signs out other sessions |
@@ -104,7 +104,6 @@ A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revok
 | PATCH | `/games/{id}/moves` | `{ moves }` (PGN/SAN, up to 20 000 chars; blank clears). Either player or an admin, any status except `VOIDED`. Doesn't touch ratings. |
 | GET | `/games/{id}/context` | `{ expected: { white, black }, upset, meeting, headToHead: { games, whiteWins, draws, blackWins, firstPlayedAt }, recent: { id, playedAt, whiteId, result }[] }`. See below. |
 
-**Game context.** `expected` is each side's Glicko-2 expected score, from the ratings just before the game (the rating history) once it's confirmed, otherwise from current ratings; `black = 1 − white`. `upset` is true for a confirmed decisive game whose winner had an expected score below 0.35. `headToHead` counts the confirmed games between the two, with wins seen from this game's sides; `meeting` is this game's number among them (null if it isn't confirmed). `recent` is up to five of their other confirmed games, newest first.
 | GET | `/games/{id}/comments` | Threads, oldest first: `{ id, parentId, author, replyTo, body, createdAt, editedAt, deleted, likeCount, likedByMe, likedBy, canEdit, canDelete, canLike, replies }[]`. `replies` holds the thread's answers, oldest first (one level, like Facebook). |
 | POST | `/games/{id}/comments` | `{ body, parentId? }` (1–1000 chars) → 201. Not on voided games. With `parentId` it's a reply: answering a reply files it under the same thread, and `replyTo` is the person you answered. |
 | PATCH | `/games/{id}/comments/{commentId}` | `{ body }`. Author only. |
@@ -117,11 +116,37 @@ A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revok
 
 Every game also carries `canEditMoves`, `commentCount`, `kudosCount`, `kudosGivenByMe` and `canGiveKudos`.
 
+**Game context.** `expected` is each side's Glicko-2 expected score, from the ratings just before the game (the rating history) once it's confirmed, otherwise from current ratings; `black = 1 − white`. `upset` is true for a confirmed decisive game whose winner had an expected score below 0.35. `headToHead` counts the confirmed games between the two, with wins seen from this game's sides; `meeting` is this game's number among them (null if it isn't confirmed). `recent` is up to five of their other confirmed games, newest first.
+
 Moves are checked for legality in the app (chess.js) before they're sent; the server stores them as text.
 
 ## Leaderboard
 
 `GET /leaderboard` → `{ rank, player: PlayerRef, games, wins, draws, losses, lastPlayedAt, trend }[]`. `trend` is the rating change over the player's last 5 games. Provisional players are listed after ranked ones, with `rank: null`.
+
+## Monthly awards ("Månedens spiller")
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/awards/race?month=` | Standings for a month (`YYYY-MM`, default this month) → `AwardRace`. Months from 2000-01 up to this month; anything else is 400 `award.bad_month`. |
+| GET | `/awards?player=` | Awards that were won, newest first (player of the month before most active within a month) → `Award[]`. With `player` (a username), only theirs; unknown player → 404 `player.not_found`. |
+
+```ts
+AwardRace     { month: "2026-11", status: "LIVE"|"DECIDING"|"DECIDED", endsAt, decidesAt, minGames,
+                playerOfMonth: AwardCategory, mostActive: AwardCategory }
+AwardCategory { winner: Award | null,            // set once the month is DECIDED and someone qualified
+                standings: AwardStanding[] }      // everyone who played, best first (max 20)
+AwardStanding { player: PlayerRef, games, wins, draws, losses, points, expected, overExpected, ratingChange, qualified }
+Award         { month, kind: "PLAYER_OF_MONTH"|"MOST_ACTIVE", player: PlayerRef, games, points, expected,
+                overExpected, ratingChange, decidedAt }
+```
+
+**The rules.** Only confirmed games count, and months follow Norwegian time (`app.awards.zone`, `Europe/Oslo`).
+
+- **Player of the month** has the most points over expectation: for each game, the score (1, ½, 0) minus the expected score from Glicko-2 at both players' ratings before the game (as on the game page). Beating a stronger player is worth more; playing more helps only if you play well. Over all players the total is zero. You need at least `minGames` (3) games and a positive total. Ties: more games, then the bigger rating gain, then the older account.
+- **Most active** played the most games (at least `minGames`). Ties: more points over expectation, then the older account.
+
+A month is `LIVE` until it ends, `DECIDING` for `app.awards.decide-after` (3 days, so late confirmations count), then `DECIDED`: the winners are stored once in `monthly_awards` and never change, even if an old game is corrected later. The standings for a decided month are still computed live. Deciding runs every hour, on startup and before every awards read, and is safe to run in parallel.
 
 ## Tournaments
 

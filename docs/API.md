@@ -12,7 +12,7 @@ Errors use `application/problem+json` (RFC 7807) and always include a stable **`
 
 Validation errors use `code: "validation"` with `errors` (field → English message) and `errorCodes` (field → constraint: `NotBlank`, `NotNull`, `Size`, `Pattern`, `PlainText`). `PlainText` means the text contains control characters (tabs and line breaks are fine).
 
-The full list of codes and their Norwegian/English texts lives in `frontend/src/i18n/en.ts` / `nb.ts` under `errors.codes`. Generic codes: `conflict`, `concurrent_change`, `forbidden`, `server_error`, `validation`, `request.malformed` (body missing, not valid JSON for the endpoint, or a bad path/query value), `request.rejected`, `not_found`, `method_not_allowed`, `not_acceptable`, `unsupported_media_type`, `request.too_large`, and from the security layer `auth.not_logged_in` (401), `forbidden` and `csrf` (403). A frontend test (`backendCodes.test.ts`) scans the backend source and fails if any code lacks a Norwegian or English text.
+The full list of codes and their Norwegian/English texts lives in `frontend/src/i18n/en.ts` / `nb.ts` under `errors.codes`. Generic codes: `conflict`, `concurrent_change`, `forbidden`, `server_error`, `server.unavailable`, `validation`, `request.malformed` (body missing, not valid JSON for the endpoint, or a bad path/query value), `request.rejected`, `not_found`, `method_not_allowed`, `not_acceptable`, `unsupported_media_type`, `request.too_large`, and from the security layer `auth.not_logged_in` (401), `forbidden` and `csrf` (403). A frontend test (`backendCodes.test.ts`) scans the backend source and fails if any code lacks a Norwegian or English text.
 
 | Status | Meaning |
 |---|---|
@@ -21,7 +21,16 @@ The full list of codes and their Norwegian/English texts lives in `frontend/src/
 | 403 | Logged in but not allowed (`forbidden`), or missing/invalid CSRF header (`csrf`) |
 | 404 | Not found |
 | 409 | State conflict (e.g. game already confirmed, bracket already advanced) |
+| 413 | Request body over 128 KB (`request.too_large`) |
 | 429 | Too many attempts (login lockout, rate limit). `Retry-After` header is set. |
+| 500 | A bug (`server_error`). The body has a **`ref`**, a six-character error code like `K7Q2MX` that is also in the server log next to the stack trace, so a report that quotes it finds the right line. Nothing else about the failure is sent. |
+| 503 | The database isn't answering, usually Neon waking up (`server.unavailable`). `Retry-After: 10`; try again shortly. |
+
+Errors that happen outside the controllers (in a security filter, for example) get the same shape: `/error` answers with problem JSON too, and opening `/error` directly is a plain `404 not_found`.
+
+```json
+{ "status": 500, "title": "Internal Server Error", "detail": "Something went wrong on our side. Reference: K7Q2MX", "code": "server_error", "ref": "K7Q2MX" }
+```
 
 ## Common shapes
 

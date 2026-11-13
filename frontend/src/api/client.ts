@@ -4,7 +4,8 @@ import { reportServerError } from '../lib/errorReporting'
 
 /**
  * An API failure. `code` is the server's stable error code (translated by `useErrorText`);
- * `message` is an English fallback for logs.
+ * `message` is an English fallback for logs. `ref` is set on unexpected server errors: the code
+ * to quote when reporting it, which finds the matching line in the server log.
  */
 export class ApiError extends Error {
   readonly status: number
@@ -12,6 +13,7 @@ export class ApiError extends Error {
   readonly params: Record<string, unknown>
   readonly fieldErrors: Record<string, string>
   readonly fieldCodes: Record<string, string>
+  readonly ref: string | null
 
   constructor(
     status: number,
@@ -21,6 +23,7 @@ export class ApiError extends Error {
       params?: Record<string, unknown>
       fieldErrors?: Record<string, string>
       fieldCodes?: Record<string, string>
+      ref?: string | null
     } = {},
   ) {
     super(message)
@@ -29,7 +32,13 @@ export class ApiError extends Error {
     this.params = opts.params ?? {}
     this.fieldErrors = opts.fieldErrors ?? {}
     this.fieldCodes = opts.fieldCodes ?? {}
+    this.ref = opts.ref ?? null
   }
+}
+
+/** True when the server says the thing asked for doesn't exist (or never did). */
+export function isNotFound(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404
 }
 
 const CSRF_COOKIE = 'XSRF-TOKEN'
@@ -94,13 +103,12 @@ async function send(path: string, init: RequestInit): Promise<Response> {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
 async function toError(res: Response): Promise<ApiError> {
-  // A crash on the server (not a sleeping server, which answers 502–504 through the proxy)
-  if (res.status === 500) reportServerError(500, res.url ? new URL(res.url).pathname : '')
   let message = `HTTP ${res.status}`
   let code: string | null = null
   let params: Record<string, unknown> = {}
   let fieldErrors: Record<string, string> = {}
   let fieldCodes: Record<string, string> = {}
+  let ref: string | null = null
   try {
     const body: unknown = await res.json()
     if (isRecord(body)) {
@@ -109,11 +117,14 @@ async function toError(res: Response): Promise<ApiError> {
       if (isRecord(body.params)) params = body.params
       if (isRecord(body.errors)) fieldErrors = body.errors as Record<string, string>
       if (isRecord(body.errorCodes)) fieldCodes = body.errorCodes as Record<string, string>
+      if (typeof body.ref === 'string' && /^[A-Z0-9]{4,12}$/.test(body.ref)) ref = body.ref
     }
   } catch {
     /* not JSON (e.g. a proxy error page) */
   }
-  return new ApiError(res.status, message, { code, params, fieldErrors, fieldCodes })
+  // A crash on the server (not a sleeping server, which answers 502–504 through the proxy)
+  if (res.status === 500) reportServerError(500, res.url ? new URL(res.url).pathname : '', ref ?? undefined)
+  return new ApiError(res.status, message, { code, params, fieldErrors, fieldCodes, ref })
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {

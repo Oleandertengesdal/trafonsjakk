@@ -77,4 +77,17 @@ describe('FeedbackPage', () => {
     expect(screen.getByRole('button', { name: en.feedback.copy })).toBeInTheDocument()
     expect(screen.getByText(SUPPORT_EMAIL)).toBeInTheDocument()
   })
+
+  it('carries the error code from an error page into the email', () => {
+    renderPage('/feedback?from=%2Fgames%2F12&ref=K7Q2MX')
+    expect(mailto().body).toContain(en.feedback.bodyRef('K7Q2MX'))
+    expect(screen.getByText('K7Q2MX')).toBeInTheDocument()
+    expect(screen.getByText(en.feedback.refHint)).toBeInTheDocument()
+  })
+
+  it('ignores an error code that the app could not have made', () => {
+    renderPage('/feedback?ref=%3Cscript%3E')
+    expect(mailto().body).not.toContain('script')
+    expect(screen.queryByText(en.feedback.refHint)).not.toBeInTheDocument()
+  })
 })

@@ -48,7 +48,35 @@ export function startErrorReporting(dsn: string | undefined = import.meta.env.VI
   })
 }
 
+const REF_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+
+/** A short code like the server's error references (no 0/O or 1/I/L), for errors that happen in the browser. */
+export function newErrorRef(): string {
+  const bytes = new Uint8Array(6)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => REF_ALPHABET[b % REF_ALPHABET.length]).join('')
+}
+
+/** A page crashed. The reference is shown to the person and, with Sentry on, attached to the report. */
+export function reportCrash(error: unknown, ref: string, componentStack?: string) {
+  sentry?.withScope((scope) => {
+    scope.setTag('ref', ref)
+    if (componentStack) scope.setContext('react', { componentStack })
+    sentry?.captureException(error)
+  })
+}
+
 /** The server failed (5xx). Reported from here because the API itself has no error alerts. */
-export function reportServerError(status: number, path: string) {
-  sentry?.captureMessage(`API ${status} on ${scrubUrl(path).replace(/\/\d+(?=\/|$)/g, '/:id')}`, 'error')
+export function reportServerError(status: number, path: string, ref?: string) {
+  sentry?.withScope((scope) => {
+    if (ref) scope.setTag('ref', ref)
+    sentry?.captureMessage(`API ${status} on ${scrubUrl(path).replace(/\/\d+(?=\/|$)/g, '/:id')}`, 'error')
+  })
+}
+
+/** Where "report it" goes: the feedback page, with the current page and the error code filled in. */
+export function feedbackHref(ref?: string | null): string {
+  const params = new URLSearchParams({ from: window.location.pathname })
+  if (ref) params.set('ref', ref)
+  return `/feedback?${params}`
 }

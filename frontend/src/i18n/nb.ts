@@ -392,8 +392,6 @@ export const nb: Dict = {
   },
 
   profile: {
-    notFound: 'Ingen spiller med det brukernavnet',
-    seeAll: 'Se alle spillere',
     memberSince: (username, date) => `${username}, medlem siden ${date}`,
     rank: (n) => `Nummer ${n}`,
     provisional: 'Foreløpig',
@@ -843,17 +841,37 @@ export const nb: Dict = {
     subject: 'Feil på Trafonsjakk',
     bodyWhat: 'Hva gjorde du, og hva skjedde?',
     bodyPage: (url: string) => `Side: ${url}`,
+    bodyRef: (ref: string) => `Feilkode: ${ref}`,
+    refHint: 'Ta med denne feilkoden. E-postknappen legger den inn for deg.',
     link: 'Fant du en feil?',
   },
 
-  notFound: {
-    title: 'Denne siden ga opp',
-    body: 'Det finnes ingenting på denne adressen.',
-    back: 'Tilbake til forsiden',
+  errorPage: {
+    home: 'Til forsiden',
+    notFound: {
+      page: { title: 'Denne døra fører ingen steder', body: 'Det finnes ingenting på denne adressen. Lenken kan være feil, eller siden er flyttet.' },
+      game: { title: 'Fant ikke partiet', body: 'Det kan ha blitt annullert, eller lenken er feil.' },
+      player: { title: 'Fant ikke spilleren', body: 'Brukernavnet kan være feilstavet, eller kontoen er slettet.' },
+      tournament: { title: 'Fant ikke turneringen', body: 'Den kan ha blitt avlyst, eller lenken er feil.' },
+      live: { title: 'Fant ikke direktepartiet', body: 'Lenken kan være feil. Partiene som spilles nå, finner du under Direkte.' },
+    },
+    allOf: { game: 'Alle partier', player: 'Ratinglista', tournament: 'Alle turneringer', live: 'Direkte' },
+    crash: {
+      title: 'Sikringen gikk',
+      body: 'Noe på denne siden krasjet. Som regel hjelper det å laste inn siden på nytt. Hvis ikke: si fra, og ta med feilkoden.',
+    },
+    update: { title: 'Det er kommet en ny versjon', body: 'Last inn siden på nytt for å få den.' },
+    reload: 'Last inn på nytt',
+    report: 'Si fra',
+    reference: 'Feilkode',
+    copy: 'Kopier feilkoden',
+    copied: 'Kopiert',
   },
 
   errors: {
     network: 'Får ikke kontakt med serveren. Sjekk nettforbindelsen.',
+    offline: 'Du er frakoblet. Dette trenger nett.',
+    offlineBanner: 'Du er frakoblet. Ingenting kan lagres før du er på nett igjen.',
     waking: 'Serveren våkner. Prøv igjen om noen sekunder.',
     generic: 'Noe gikk galt. Prøv igjen.',
     http: {
@@ -930,6 +948,7 @@ export const nb: Dict = {
       concurrent_change: 'Noen andre endret dette samtidig. Last inn på nytt og prøv igjen.',
       forbidden: 'Du har ikke tilgang til å gjøre det.',
       server_error: 'Noe gikk galt hos oss.',
+      'server.unavailable': 'Databasen våkner. Prøv igjen om noen sekunder.',
       validation: 'Noen felt må rettes.',
       'request.malformed': 'Appen sendte en forespørsel serveren ikke kunne lese. Last inn siden på nytt og prøv igjen.',
       'request.rejected': 'Serveren kunne ikke behandle forespørselen. Last inn siden på nytt og prøv igjen.',

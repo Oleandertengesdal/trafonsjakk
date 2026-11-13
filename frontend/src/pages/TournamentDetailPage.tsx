@@ -22,6 +22,8 @@ import { useI18n } from '../i18n/I18nProvider'
 import { roundName } from '../i18n/rounds'
 import { useErrorText } from '../i18n/useErrorText'
 import { cn } from '../lib/cn'
+import { isNotFound } from '../api/client'
+import { NotFoundPage } from './NotFoundPage'
 
 type Action = 'join' | 'leave' | 'start' | 'cancel'
 
@@ -33,12 +35,7 @@ export function TournamentDetailPage() {
   const td = t.tournamentDetail
   const q = useQuery({ queryKey: ['tournament', id], queryFn: () => tournamentsApi.get(id), enabled: valid })
 
-  if (!valid)
-    return (
-      <Panel>
-        <ErrorNotice error={null} />
-      </Panel>
-    )
+  if (!valid) return <NotFoundPage what="tournament" />
   if (q.isPending)
     return (
       <div className="flex flex-col gap-6" role="status" aria-label={t.common.loading}>
@@ -46,6 +43,7 @@ export function TournamentDetailPage() {
         <Skeleton className="h-96 rounded-panel" />
       </div>
     )
+  if (q.isError && isNotFound(q.error)) return <NotFoundPage what="tournament" />
   if (q.isError)
     return (
       <Panel>

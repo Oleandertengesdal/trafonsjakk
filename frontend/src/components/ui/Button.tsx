@@ -1,4 +1,4 @@
-import { forwardRef, type ButtonHTMLAttributes } from 'react'
+import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes } from 'react'
 import { Link, type LinkProps } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -29,6 +29,11 @@ function buttonClass(variant: Variant = 'primary', size: Size = 'md', className?
 /** A router link that looks like a button (never nest a <button> inside a link). */
 export function ButtonLink({ variant, size, className, ...rest }: LinkProps & { variant?: Variant; size?: Size }) {
   return <Link className={buttonClass(variant, size, className)} {...rest} />
+}
+
+/** A plain link (full page load) that looks like a button: for places without a router, like the crash page. */
+export function ButtonAnchor({ variant, size, className, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { variant?: Variant; size?: Size }) {
+  return <a className={buttonClass(variant, size, className)} {...rest} />
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound } from 'lucide-react'
+import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound, WifiOff } from 'lucide-react'
 import { gamesApi } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthProvider'
 import { useI18n } from '../../i18n/I18nProvider'
@@ -10,6 +10,9 @@ import { LogoMark, Wordmark } from '../brand/LogoMark'
 import { Avatar } from '../chess/Avatar'
 import { Rating } from '../chess/PlayerLink'
 import { LanguageSwitch } from '../ui/LanguageSwitch'
+import { useOnline } from '../../hooks/useOnline'
+import { CrashPage } from '../errors/CrashPage'
+import { ErrorBoundary } from '../errors/ErrorBoundary'
 
 type NavItem = { to: string; label: string; icon: typeof House; end?: boolean; badge?: number }
 
@@ -19,6 +22,7 @@ export function AppShell() {
   const pending = useQuery({ queryKey: ['pending'], queryFn: gamesApi.pending, refetchInterval: 60_000 })
   const pendingCount = pending.data?.length ?? 0
   const { pathname } = useLocation()
+  const online = useOnline()
   useEffect(() => {
     window.scrollTo({ top: 0 })
   }, [pathname])
@@ -122,7 +126,16 @@ export function AppShell() {
 
       <main id="main" className="min-w-0 px-4 pt-5 pb-28 sm:px-6 md:px-10 md:pt-9 md:pb-16">
         <div className="mx-auto max-w-[68rem]">
-          <Outlet />
+          {!online && (
+            <p role="status" className="mb-5 flex items-center gap-2.5 rounded-control border border-line bg-surface px-4 py-3 text-[0.9375rem] text-muted">
+              <WifiOff aria-hidden className="size-4.5 shrink-0 text-accent" />
+              {t.errors.offlineBanner}
+            </p>
+          )}
+          {/* A crash takes down this page only; the navigation stays, and moving on resets it */}
+          <ErrorBoundary resetKey={pathname} fallback={(crash) => <CrashPage {...crash} />}>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
 

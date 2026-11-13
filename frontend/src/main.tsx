@@ -7,10 +7,16 @@ import '@fontsource/ibm-plex-sans/600.css'
 import './index.css'
 import { App } from './App'
 import { startErrorReporting } from './lib/errorReporting'
+import { reloadForUpdate } from './lib/staleChunks'
 import { applyTheme } from './lib/theme'
 
 applyTheme()
 startErrorReporting()
+
+// A chunk from the previous deploy is gone: reload once to get the new version (see lib/staleChunks)
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForUpdate()) event.preventDefault()
+})
 
 // Makes the app installable and shows a friendly page when offline (public/sw.js). Not in development,
 // where it would only get in the way of hot reloading.

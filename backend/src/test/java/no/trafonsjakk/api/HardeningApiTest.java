@@ -54,4 +54,22 @@ class HardeningApiTest extends IntegrationTest {
         assertThat(session().post("/api/auth/login", Map.of("username", alice.username(), "password", PASSWORD)).status())
                 .as("logins for that account wait too").isEqualTo(429);
     }
+
+    @Test
+    void unknownAddressesAndMethodsAnswerWithACode() {
+        Response unknown = admin.api().get("/api/no-such-thing");
+        assertThat(unknown.status()).isEqualTo(404);
+        assertThat(unknown.code()).isEqualTo("not_found");
+        Response wrongMethod = admin.api().delete("/api/leaderboard");
+        assertThat(wrongMethod.status()).isEqualTo(405);
+        assertThat(wrongMethod.code()).isEqualTo("method_not_allowed");
+        Response badId = admin.api().get("/api/games/not-a-number");
+        assertThat(badId.status()).isEqualTo(400);
+        assertThat(badId.code()).isEqualTo("request.malformed");
+        // Opening the error page directly reveals nothing
+        Response direct = admin.api().get("/error");
+        assertThat(direct.status()).isEqualTo(404);
+        assertThat(direct.code()).isEqualTo("not_found");
+        assertThat(direct.body()).doesNotContain("trace", "exception", "timestamp");
+    }
 }

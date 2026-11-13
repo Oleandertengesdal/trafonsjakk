@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, CloudOff, Loader2, Sun } from 'lucide-react'
-import { ApiError } from '../api/client'
+import { ApiError, isNotFound } from '../api/client'
 import { liveApi } from '../api/endpoints'
 import { invalidateResults } from '../api/queryClient'
 import type { GameResult, LiveGame } from '../api/types'
@@ -20,6 +20,7 @@ import { LiveDot } from '../components/chess/Live'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { useI18n } from '../i18n/I18nProvider'
 import { useErrorText } from '../i18n/useErrorText'
+import { NotFoundPage } from './NotFoundPage'
 
 const MoveRecorder = lazy(() => import('../components/chess/MoveRecorder'))
 const LiveBoard = lazy(() => import('../components/chess/LiveBoard'))
@@ -42,6 +43,7 @@ export function LiveGamePage() {
   useWakeLock(q.data?.status === 'LIVE')
 
   if (q.isPending) return <Skeleton className="h-[32rem] w-full rounded-panel" />
+  if (q.isError && isNotFound(q.error)) return <NotFoundPage what="live" />
   if (q.isError)
     return (
       <Panel>

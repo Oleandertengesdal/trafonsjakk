@@ -4,6 +4,7 @@ import { Check, Copy, Mail } from 'lucide-react'
 import { useI18n } from '../i18n/I18nProvider'
 import { SUPPORT_EMAIL } from '../lib/contact'
 import { safeAppPath } from '../lib/safePath'
+import { ErrorReference } from '../components/errors/ErrorScene'
 import { AuthLayout } from './AuthLayout'
 
 /** "Found a problem?": how to email the admin. Public, so it also helps people who can't log in. */
@@ -12,6 +13,8 @@ export function FeedbackPage() {
   const f = t.feedback
   const [params] = useSearchParams()
   const from = safeAppPath(params.get('from'))
+  // An error code from an error page; only the shape the app makes is accepted
+  const ref = /^[A-Z0-9]{4,12}$/.test(params.get('ref') ?? '') ? params.get('ref') : null
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -20,7 +23,9 @@ export function FeedbackPage() {
     return () => clearTimeout(timer)
   }, [copied])
 
-  const body = [f.bodyWhat, '', '', '', from ? f.bodyPage(window.location.origin + from) : null].filter((l) => l !== null).join('\n')
+  const body = [f.bodyWhat, '', '', '', from ? f.bodyPage(window.location.origin + from) : null, ref ? f.bodyRef(ref) : null]
+    .filter((l) => l !== null)
+    .join('\n')
   // encodeURIComponent, not URLSearchParams: some mail apps show a "+" instead of a space
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(f.subject)}&body=${encodeURIComponent(body)}`
 
@@ -50,6 +55,13 @@ export function FeedbackPage() {
         <li>{f.help2}</li>
         <li>{f.help3}</li>
       </ul>
+
+      {ref && (
+        <div className="mt-5">
+          <ErrorReference value={ref} />
+          <p className="mt-2 text-sm text-muted">{f.refHint}</p>
+        </div>
+      )}
 
       <a
         href={mailto}

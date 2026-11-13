@@ -396,8 +396,6 @@ export const en = {
   },
 
   profile: {
-    notFound: 'No player with that username',
-    seeAll: 'See all players',
     memberSince: (username: string, date: string) => `${username}, member since ${date}`,
     rank: (n: number) => `Rank #${n}`,
     provisional: 'Provisional',
@@ -848,17 +846,37 @@ export const en = {
     subject: 'Problem on Trafonsjakk',
     bodyWhat: 'What did you do, and what happened?',
     bodyPage: (url: string) => `Page: ${url}`,
+    bodyRef: (ref: string) => `Error code: ${ref}`,
+    refHint: 'Include this error code. The email button adds it for you.',
     link: 'Found a problem?',
   },
 
-  notFound: {
-    title: 'This page resigned',
-    body: "There's nothing at this address.",
-    back: 'Back to home',
+  errorPage: {
+    home: 'Back to home',
+    notFound: {
+      page: { title: 'This door doesn’t lead anywhere', body: 'There’s nothing at this address. The link may be wrong, or the page has moved.' },
+      game: { title: 'We couldn’t find that game', body: 'It may have been voided, or the link is wrong.' },
+      player: { title: 'We couldn’t find that player', body: 'The username may be misspelt, or the account has been deleted.' },
+      tournament: { title: 'We couldn’t find that tournament', body: 'It may have been cancelled, or the link is wrong.' },
+      live: { title: 'We couldn’t find that live game', body: 'The link may be wrong. Games being played now are on the live page.' },
+    },
+    allOf: { game: 'All games', player: 'Ratings', tournament: 'All tournaments', live: 'Live games' },
+    crash: {
+      title: 'A fuse blew',
+      body: 'Something on this page crashed. Reloading usually fixes it. If it doesn’t, tell us and include the error code.',
+    },
+    update: { title: 'A new version is out', body: 'Reload the page to get it.' },
+    reload: 'Reload the page',
+    report: 'Report it',
+    reference: 'Error code',
+    copy: 'Copy the error code',
+    copied: 'Copied',
   },
 
   errors: {
     network: "Can't reach the server. Check your connection.",
+    offline: 'You’re offline. This needs a connection.',
+    offlineBanner: 'You’re offline. Nothing can be saved until you’re back online.',
     waking: 'The server is waking up. Try again in a few seconds.',
     generic: 'Something went wrong. Try again.',
     http: {
@@ -936,6 +954,7 @@ export const en = {
       concurrent_change: 'Someone else changed this at the same time. Refresh and try again.',
       forbidden: "You don't have permission to do that.",
       server_error: 'Something went wrong on our side.',
+      'server.unavailable': 'The database is waking up. Try again in a few seconds.',
       validation: 'Some fields need fixing.',
       'request.malformed': "The app sent a request the server couldn't read. Reload the page and try again.",
       'request.rejected': "The server couldn't handle that request. Reload the page and try again.",

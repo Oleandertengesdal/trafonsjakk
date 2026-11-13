@@ -406,7 +406,15 @@ All errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) `application/p
   "errorCodes": { "username": "Pattern" } }
 ```
 
-Stack traces and SQL never reach the client.
+Stack traces and SQL never reach the client. An unexpected error (500) instead gets a short `ref` (`ErrorRef`: six characters without 0/O or 1/I/L), returned to the client and logged with the stack trace as `Unhandled error [ref K7Q2MX] GET /api/...`. When the database can't be reached (`CannotCreateTransactionException`, `DataAccessResourceFailureException` or SQL state class 08/57P anywhere in the cause chain) the answer is `503 server.unavailable` with `Retry-After`, because it's temporary. `ProblemErrorController` replaces Spring Boot's `/error` page so errors raised outside Spring MVC have the same shape.
+
+On the frontend:
+
+- **404s** (`NotFoundPage`): an unknown address, or a game, player, tournament or live game the API says doesn't exist, shows the Trafon facade with its lights on and "404" on the house-number plate, and a link to the list it would have been in.
+- **Crashes** (`ErrorBoundary` + `CrashPage`): one boundary around each page inside the app shell (the navigation survives, and moving to another page resets it) and one around the whole app. The facade goes dark ("Sikringen gikk": Trafon was a transformer station), with an error code made in the browser, reported to Sentry when that's on, and a "report it" link that carries the code to the feedback page and into the email.
+- **New deploys**: a lazily loaded chunk that no longer exists means a new version is out, not a bug. The app reloads once by itself (`lib/staleChunks.ts`, also on Vite's `vite:preloadError`); if that doesn't help, the page says a new version is out.
+- **Inline errors** (`ErrorNotice`): the message in the person's language, a retry button, and for 500s the server's error code with a copy button and a "report it" link. Loads retry while the server or database wakes up (502–504, network errors), and only once on a 500.
+- **Offline**: a banner under the header while the browser is offline, and "you're offline" instead of "can't reach the server".
 
 ---
 

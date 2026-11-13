@@ -56,6 +56,11 @@
   --c-roof: #2e333a;
   --c-trim: #fbf6ec;
   --c-glass: #3a4852;
+  /* the Trafon drawing: grey stone plinth and steps, and windows with the lights on */
+  --c-brick: #a32f25;
+  --c-plinth: #5f5c57;
+  --c-step: #9d978d;
+  --c-lit: #f3cf86;
 }
 
 :root[data-theme='dark'] {
@@ -79,6 +84,10 @@
   --c-roof: #101113;
   --c-trim: #eadfcd;
   --c-glass: #2b363e;
+  --c-brick: #962b22;
+  --c-plinth: #3c3d40;
+  --c-step: #5a5a5c;
+  --c-lit: #e6b65e;
 }
 
 html {

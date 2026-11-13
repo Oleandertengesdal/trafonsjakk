@@ -1,18 +1,22 @@
+import { ErrorScene } from '../components/errors/ErrorScene'
 import { ButtonLink } from '../components/ui/Button'
 import { useI18n } from '../i18n/I18nProvider'
 
-export function NotFoundPage() {
-  const { t } = useI18n()
+export type Missing = 'page' | 'game' | 'player' | 'tournament' | 'live'
+
+/** Where to look instead: the list the missing thing would have been in. */
+const LIST: Record<Exclude<Missing, 'page'>, string> = { game: '/games', player: '/leaderboard', tournament: '/tournaments', live: '/live' }
+
+/** 404: an unknown address, or a game, player, tournament or live game that doesn't exist (any more). */
+export function NotFoundPage({ what = 'page' }: { what?: Missing }) {
+  const e = useI18n().t.errorPage
+  const list = what === 'page' ? null : { to: LIST[what], label: e.allOf[what] }
   return (
-    <div className="flex flex-col items-center py-20 text-center">
-      <p className="font-display text-6xl font-bold text-faint" aria-hidden>
-        0–1
-      </p>
-      <h1 className="mt-4 font-display text-2xl font-bold">{t.notFound.title}</h1>
-      <p className="mt-2 text-muted">{t.notFound.body}</p>
-      <ButtonLink to="/" variant="secondary" className="mt-6">
-        {t.notFound.back}
+    <ErrorScene plate="404" lights="on" title={e.notFound[what].title} body={e.notFound[what].body}>
+      {list && <ButtonLink to={list.to}>{list.label}</ButtonLink>}
+      <ButtonLink to="/" variant={list ? 'secondary' : 'primary'}>
+        {e.home}
       </ButtonLink>
-    </div>
+    </ErrorScene>
   )
 }

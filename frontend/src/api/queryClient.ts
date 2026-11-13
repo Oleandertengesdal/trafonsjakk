@@ -1,17 +1,23 @@
 import { QueryClient } from '@tanstack/react-query'
 import { ApiError } from './client'
 
+/**
+ * Retry while a free-tier backend (or its database) is waking up; never retry auth/validation errors.
+ * A crash in our own code (500) gets one more try, then shows its error code instead of spinning.
+ */
+export function shouldRetry(count: number, error: unknown): boolean {
+  if (error instanceof ApiError && error.status > 0 && error.status < 500) return false
+  if (error instanceof ApiError && error.status === 500) return count < 1
+  // Free hosting sleeps when idle and takes up to a minute to wake: keep trying for ~50 s.
+  return count < 6
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
       refetchOnWindowFocus: true,
-      retry: (count, error) => {
-        // Retry while a free-tier backend is waking up; never retry auth/validation errors.
-        if (error instanceof ApiError && error.status > 0 && error.status < 500) return false
-        // Free hosting sleeps when idle and takes up to a minute to wake: keep trying for ~50 s.
-        return count < 6
-      },
+      retry: shouldRetry,
       retryDelay: (n) => Math.min(1500 * 2 ** n, 10_000),
     },
   },

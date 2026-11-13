@@ -8,7 +8,7 @@ export function useErrorText() {
   return useCallback(
     (e: unknown): string => {
       if (e instanceof ApiError) {
-        if (e.status === 0) return t.errors.network
+        if (e.status === 0) return typeof navigator !== 'undefined' && navigator.onLine === false ? t.errors.offline : t.errors.network
         const entry = e.code ? t.errors.codes[e.code] : undefined
         if (typeof entry === 'function') return entry(e.params)
         if (typeof entry === 'string') return entry

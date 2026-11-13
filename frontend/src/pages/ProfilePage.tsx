@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Crown, Flame, Skull, Swords, Target, Trophy } from 'lucide-react'
-import { ApiError } from '../api/client'
 import { gamesApi, usersApi } from '../api/endpoints'
 import type { Stats, Tally } from '../api/types'
 import { AwardBadges } from '../components/awards/AwardBadges'
@@ -19,6 +18,8 @@ import { Panel } from '../components/ui/Panel'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useI18n } from '../i18n/I18nProvider'
 import { cn } from '../lib/cn'
+import { isNotFound } from '../api/client'
+import { NotFoundPage } from './NotFoundPage'
 
 export function ProfilePage() {
   const username = useParams().username ?? ''
@@ -29,17 +30,7 @@ export function ProfilePage() {
 
   if (q.isPending) return <ProfileSkeleton />
   if (q.isError) {
-    if (q.error instanceof ApiError && q.error.status === 404)
-      return (
-        <EmptyState
-          title={pr.notFound}
-          action={
-            <Link to="/leaderboard" className="text-accent hover:underline">
-              {pr.seeAll}
-            </Link>
-          }
-        />
-      )
+    if (isNotFound(q.error)) return <NotFoundPage what="player" />
     return (
       <Panel>
         <ErrorNotice error={q.error} onRetry={() => q.refetch()} />

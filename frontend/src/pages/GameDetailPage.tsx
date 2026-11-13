@@ -18,6 +18,8 @@ import { Panel } from '../components/ui/Panel'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useI18n } from '../i18n/I18nProvider'
 import { cn } from '../lib/cn'
+import { isNotFound } from '../api/client'
+import { NotFoundPage } from './NotFoundPage'
 
 export function GameDetailPage() {
   const { id: rawId } = useParams()
@@ -28,8 +30,9 @@ export function GameDetailPage() {
   // Shared with the context panel below; only a confirmed result can be an upset.
   const ctx = useQuery({ queryKey: ['games', 'context', id], queryFn: () => gamesApi.context(id), enabled: q.data?.status === 'CONFIRMED' })
 
-  if (!Number.isInteger(id) || id <= 0) return <Panel><ErrorNotice error={null} /></Panel>
+  if (!Number.isInteger(id) || id <= 0) return <NotFoundPage what="game" />
   if (q.isPending) return <Skeleton className="h-72 w-full rounded-panel" />
+  if (q.isError && isNotFound(q.error)) return <NotFoundPage what="game" />
   if (q.isError) return <Panel><ErrorNotice error={q.error} onRetry={() => q.refetch()} /></Panel>
   const g = q.data
   const d = t.gameDetail

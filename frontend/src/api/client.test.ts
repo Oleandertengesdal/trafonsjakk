@@ -189,4 +189,16 @@ describe('api client', () => {
     await expect(api('/api/games/1/confirm', { method: 'POST' })).resolves.toEqual({ ok: true })
     expect(callsTo('/api/games/1/confirm').map((c) => c.headers.get('X-XSRF-TOKEN'))).toEqual(['csrf-1', 'rotated'])
   })
+
+  it('keeps the error code of an unexpected server error, and only a well-formed one', async () => {
+    const { api } = await load((url) =>
+      url === '/api/a'
+        ? json(500, { code: 'server_error', detail: 'Something went wrong on our side. Reference: K7Q2MX', ref: 'K7Q2MX' })
+        : json(500, { code: 'server_error', ref: '<img src=x>' }),
+    )
+    const a = await api('/api/a').catch((e: unknown) => e)
+    expect(a).toMatchObject({ status: 500, code: 'server_error', ref: 'K7Q2MX' })
+    const b = await api('/api/b').catch((e: unknown) => e)
+    expect(b).toMatchObject({ status: 500, ref: null })
+  })
 })

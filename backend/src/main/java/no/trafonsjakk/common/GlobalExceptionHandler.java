@@ -1,9 +1,13 @@
 package no.trafonsjakk.common;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.sql.SQLException;
+import java.sql.SQLTransientConnectionException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
@@ -12,6 +16,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -56,8 +61,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "forbidden", "You don't have permission to do that.");
     }
 
+    /** The database can't be reached (Neon waking up, a network blip): worth retrying in a moment. */
+    @ExceptionHandler({DataAccessResourceFailureException.class, CannotCreateTransactionException.class})
+    ResponseEntity<ProblemDetail> handleDatabaseDown(Exception ex, HttpServletRequest request) {
+        return databaseDown(ex, request.getMethod() + " " + request.getRequestURI());
+    }
+
     @ExceptionHandler(Exception.class)
-    ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
+    ResponseEntity<ProblemDetail> handleUnexpected(Exception ex, HttpServletRequest request) {
         // An optimistic-lock failure can surface at commit time wrapped in JPA/Hibernate exceptions
         for (Throwable t = ex; t != null; t = t.getCause()) {
             if (t instanceof jakarta.persistence.OptimisticLockException || t instanceof org.hibernate.StaleStateException
@@ -69,8 +80,57 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 break;
             }
         }
-        log.error("Unhandled error", ex);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "server_error", "Something went wrong on our side.");
+        if (isDatabaseDown(ex)) {
+            return databaseDown(ex, request.getMethod() + " " + request.getRequestURI());
+        }
+        return serverError(ex, request.getMethod() + " " + request.getRequestURI());
+    }
+
+    /**
+     * 500 with a reference that's both in the response and in the log line with the stack trace. Nothing
+     * else about the failure is sent.
+     */
+    static ResponseEntity<ProblemDetail> serverError(Throwable ex, String where) {
+        String ref = ErrorRef.next();
+        log.error("Unhandled error [ref {}] {}", ref, where, ex);
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Something went wrong on our side. Reference: " + ref);
+        pd.setProperty("code", "server_error");
+        pd.setProperty("ref", ref);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(pd);
+    }
+
+    static ResponseEntity<ProblemDetail> databaseDown(Throwable ex, String where) {
+        String ref = ErrorRef.next();
+        log.warn("Database unavailable [ref {}] {}: {}", ref, where, rootMessage(ex));
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                "The database isn't answering right now. Try again in a few seconds.");
+        pd.setProperty("code", "server.unavailable");
+        pd.setProperty("ref", ref);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).header(HttpHeaders.RETRY_AFTER, "10").body(pd);
+    }
+
+    /** True if somewhere in the chain the database couldn't be reached (SQL state class 08, or a shutdown). */
+    static boolean isDatabaseDown(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
+            if (t instanceof DataAccessResourceFailureException || t instanceof CannotCreateTransactionException
+                    || t instanceof SQLTransientConnectionException) {
+                return true;
+            }
+            if (t instanceof SQLException sql && sql.getSQLState() != null
+                    && (sql.getSQLState().startsWith("08") || sql.getSQLState().startsWith("57P"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String rootMessage(Throwable ex) {
+        Throwable root = ex;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        return root.getClass().getSimpleName() + ": " + root.getMessage();
     }
 
     @Override
@@ -108,6 +168,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
                                                              HttpStatusCode statusCode, WebRequest request) {
+        if (statusCode.is5xxServerError()) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(serverError(ex, request.getDescription(false)).getBody());
+        }
         ResponseEntity<Object> response = super.handleExceptionInternal(ex, body, headers, statusCode, request);
         if (response != null && response.getBody() instanceof ProblemDetail pd
                 && (pd.getProperties() == null || !pd.getProperties().containsKey("code"))) {

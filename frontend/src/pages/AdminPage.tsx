@@ -25,6 +25,7 @@ export function AdminPage() {
   const errorText = useErrorText()
   const toast = useToast()
   const disputed = useQuery({ queryKey: ['disputed'], queryFn: adminApi.disputed })
+  const held = useQuery({ queryKey: ['held'], queryFn: adminApi.held })
   const users = useQuery({ queryKey: ['adminUsers'], queryFn: adminApi.users })
 
   const updateUser = useMutation({
@@ -74,6 +75,17 @@ export function AdminPage() {
           </ul>
         )}
       </Panel>
+
+      {/* Only shown when there is something: results that can't confirm themselves */}
+      {held.data && held.data.length > 0 && (
+        <Panel title={a.held}>
+          <ul className="divide-y divide-line">
+            {held.data.map((g) => (
+              <HeldRow key={g.id} game={g} />
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel title={a.members}>
         {users.isPending ? (
@@ -134,6 +146,21 @@ export function AdminPage() {
         )}
       </Panel>
     </div>
+  )
+}
+
+function HeldRow({ game: g }: { game: Game }) {
+  const { t, f } = useI18n()
+  return (
+    <li className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="min-w-0">
+        <Link to={`/games/${g.id}`} className="flex flex-wrap items-center gap-x-2 font-medium hover:text-accent">
+          {g.white.realName} <ResultMark result={g.result} /> {g.black.realName}
+        </Link>
+        <p className="text-[0.8125rem] text-muted">{t.admin.heldLine(g.reportedBy.realName, f.date(g.playedAt))}</p>
+      </div>
+      <AdminResolveControls game={g} />
+    </li>
   )
 }
 

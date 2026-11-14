@@ -33,7 +33,9 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * "Månedens spiller". The current month is a live race; a month is decided {@code app.awards.decide-after}
@@ -71,9 +73,11 @@ public class AwardService {
     private final ZoneId zone;
     private final Duration decideAfter;
     private final int minGames;
+    private final TransactionTemplate tx;
 
     public AwardService(GameRepository games, RatingHistoryRepository history, UserRepository users,
-                        AwardRepository awards, AppProperties props) {
+                        AwardRepository awards, AppProperties props, PlatformTransactionManager transactionManager) {
+        this.tx = new TransactionTemplate(transactionManager);
         this.games = games;
         this.history = history;
         this.users = users;
@@ -99,9 +103,11 @@ public class AwardService {
 
     private void safely() {
         try {
-            decideDueMonths(Instant.now());
+            // Through the template: a call to the @Transactional method on `this` would run without a
+            // transaction, and a month could be left with only one of its two awards stored.
+            tx.executeWithoutResult(status -> decideDueMonths(Instant.now()));
         } catch (RuntimeException e) {
-            log.warn("Deciding monthly awards failed: {}", e.getMessage());
+            log.warn("Deciding monthly awards failed", e);
         }
     }
 

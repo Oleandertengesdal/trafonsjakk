@@ -145,6 +145,8 @@ export const invitesApi = {
 
 export const adminApi = {
   disputed: () => api<Game[]>('/api/admin/games/disputed'),
+  /** Pending results that won't confirm themselves: a player's account is disabled or deleted. */
+  held: () => api<Game[]>('/api/admin/games/held'),
   resolve: (id: number, action: 'CONFIRM' | 'VOID', result?: GameResult) =>
     api<Game>(`/api/admin/games/${id}/resolve`, { method: 'POST', body: json({ action, result }) }),
   users: () => api<AdminUser[]>('/api/admin/users'),

@@ -121,6 +121,24 @@ describe('api client', () => {
     expect(expired).toHaveBeenCalledTimes(1)
   })
 
+  it('stays signed in when another tab won the refresh race, and retries the request', async () => {
+    const expired = vi.fn()
+    let refreshed = false
+    const { api, setSessionExpiredHandler } = await load((url) => {
+      if (url === '/api/auth/refresh') {
+        refreshed = true
+        return json(401, { code: 'auth.refresh_raced', detail: 'The session was just refreshed' })
+      }
+      // The other tab's new cookie is in the browser by the time the request is retried
+      return refreshed ? json(200, { ok: true }) : json(401, { code: 'auth.not_logged_in' })
+    })
+    setSessionExpiredHandler(expired)
+    await expect(api('/api/games')).resolves.toEqual({ ok: true })
+    expect(callsTo('/api/auth/refresh')).toHaveLength(1)
+    expect(callsTo('/api/games')).toHaveLength(2)
+    expect(expired).not.toHaveBeenCalled()
+  })
+
   it('does not try to refresh after a failed login', async () => {
     const { api } = await load(() => json(401, { code: 'auth.bad_credentials', detail: 'Wrong username or password' }))
     const expired = vi.fn()

@@ -44,7 +44,11 @@ public class AuthService {
         this.dummyHash = passwordEncoder.encode(Tokens.randomToken());
     }
 
-    @Transactional
+    /**
+     * Not transactional on purpose: BCrypt takes a second or more on a small server, and a transaction
+     * would hold one of the few database connections for all of it. The lookup and the token each
+     * use their own short one.
+     */
     public TokenService.IssuedTokens login(String username, String password, ClientAddress ip) {
         attempts.assertLoginAllowed(username, ip);
         User user = users.findByUsernameIgnoreCase(username.trim()).orElse(null);

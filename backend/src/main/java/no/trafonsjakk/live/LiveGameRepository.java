@@ -12,8 +12,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface LiveGameRepository extends JpaRepository<LiveGame, Long> {
 
-    @Query("select g from LiveGame g join fetch g.white join fetch g.black where g.status = 'LIVE' order by g.startedAt desc")
-    List<LiveGame> findRunning();
+    /** Running games someone has touched since {@code cutoff} (older ones were left behind). */
+    @Query("select g from LiveGame g join fetch g.white join fetch g.black "
+            + "where g.status = 'LIVE' and g.updatedAt >= :cutoff order by g.startedAt desc")
+    List<LiveGame> findRunning(@Param("cutoff") Instant cutoff);
 
     @Query("select g from LiveGame g join fetch g.white join fetch g.black where g.id = :id")
     Optional<LiveGame> findWithPlayers(@Param("id") Long id);

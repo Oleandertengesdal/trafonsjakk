@@ -26,6 +26,15 @@ import { toResult, type Outcome } from '../lib/gameResult'
 const MoveRecorder = lazy(() => import('../components/chess/MoveRecorder'))
 
 type Colour = 'WHITE' | 'BLACK'
+/** Members can date a game this far back (the server's app.games.max-backdate); admins have no limit. */
+const MEMBER_BACKDATE_DAYS = 30
+
+function earliestForMembers(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - MEMBER_BACKDATE_DAYS)
+  return toLocalInput(d)
+}
+
 type Errors = Partial<Record<'players' | 'playedAt' | 'eco' | 'opening' | 'notes' | 'moves', string>>
 
 export function LogGamePage() {
@@ -217,7 +226,7 @@ export function LogGamePage() {
           )}
 
           <Field label={l.when} error={errors.playedAt}>
-            {(p) => <Input {...p} type="datetime-local" value={playedAt} max={toLocalInput(new Date())} onChange={(e) => setPlayedAt(e.target.value)} />}
+            {(p) => <Input {...p} type="datetime-local" value={playedAt} min={isAdmin ? undefined : earliestForMembers()} max={toLocalInput(new Date())} onChange={(e) => setPlayedAt(e.target.value)} />}
           </Field>
 
           <details className="rounded-control border border-line [&_summary::-webkit-details-marker]:hidden" open={!!(errors.eco || errors.opening || errors.notes)}>

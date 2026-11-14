@@ -20,7 +20,8 @@ public record AppProperties(
     public record Cookies(boolean secure) {
     }
 
-    public record Games(Duration autoConfirmAfter) {
+    /** {@code maxBackdate}: how far back a member may date a game they log (admins aren't limited). */
+    public record Games(Duration autoConfirmAfter, Duration maxBackdate) {
     }
 
     /** Monthly awards: months in {@code zone}, decided {@code decideAfter} after they end, {@code minGames} to qualify. */

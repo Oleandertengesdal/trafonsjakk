@@ -80,7 +80,9 @@ public class AuthController {
         try {
             cookies.write(response, tokens.rotate(refresh));
         } catch (ApiException e) {
-            cookies.clear(response);
+            if (!TokenService.REFRESH_RACED.equals(e.code())) {
+                cookies.clear(response);
+            }
             throw e;
         }
         return ResponseEntity.noContent().build();

@@ -597,6 +597,9 @@ export const nb: Dict = {
     noDisputesTitle: 'Ingen tvister',
     noDisputesBody: 'Ingenting trenger oppmerksomheten din.',
     disputeLine: (reporter, date, reason) => `Registrert av ${reporter}, spilt ${date}. Begrunnelse: «${reason}»`,
+    held: 'Venter på en deaktivert konto',
+    heldLine: (reporter, date) =>
+      `Registrert av ${reporter}, spilt ${date}. En av spillerne kan ikke lenger svare, så resultatet bekreftes ikke av seg selv.`,
     members: 'Medlemmer',
     member: 'Medlem',
     joined: 'Ble med',
@@ -888,6 +891,7 @@ export const nb: Dict = {
       'auth.wrong_current_password': 'Nåværende passord er feil.',
       'auth.not_logged_in': 'Logg inn på nytt.',
       'auth.session_expired': 'Økten har utløpt. Logg inn på nytt.',
+      'auth.refresh_raced': 'Økten ble nettopp fornyet i en annen fane. Prøv igjen.',
       'auth.too_many_signups': 'For mange registreringsforsøk. Prøv igjen senere.',
       'auth.locked': (p) => `For mange mislykkede forsøk. Prøv igjen om ${p.minutes ?? 15} minutter.`,
       'admin.cannot_change_self': 'Du kan ikke endre din egen rolle eller status.',

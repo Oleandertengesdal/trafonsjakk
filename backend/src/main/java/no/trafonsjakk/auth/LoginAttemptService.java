@@ -50,6 +50,24 @@ public class LoginAttemptService {
         increment(failures, edgeKey(from.edge()));
     }
 
+    /**
+     * Password checks made while logged in (change password, delete account) count on their own, so
+     * someone hammering the login page from outside can't block the member from either. Failures
+     * here still count against logging in: a stolen session doesn't get extra guesses.
+     */
+    public void assertPasswordCheckAllowed(long userId) {
+        if (count(failures, sessionKey(userId)) >= cfg.maxFailedLoginsPerUser()) {
+            throw ApiException.tooManyRequests("auth.locked",
+                    "Too many failed attempts. Try again in " + cfg.lockoutDuration().toMinutes() + " minutes.",
+                    cfg.lockoutDuration()).with("minutes", cfg.lockoutDuration().toMinutes());
+        }
+    }
+
+    public void recordPasswordCheckFailure(long userId, String username, ClientAddress from) {
+        increment(failures, sessionKey(userId));
+        recordFailure(username, from);
+    }
+
     public void recordSuccess(String username) {
         failures.invalidate(userKey(username));
     }
@@ -76,6 +94,10 @@ public class LoginAttemptService {
 
     private static String userKey(String username) {
         return "u:" + (username == null ? "" : username.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private static String sessionKey(long userId) {
+        return "pw:" + userId;
     }
 
     private static String ipKey(String ip) {

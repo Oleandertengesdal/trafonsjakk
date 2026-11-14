@@ -602,6 +602,9 @@ export const en = {
     noDisputesBody: 'Nothing needs your attention.',
     disputeLine: (reporter: string, date: string, reason: string) =>
       `Logged by ${reporter}, played ${date}. Reason: “${reason}”`,
+    held: 'Waiting on a disabled account',
+    heldLine: (reporter: string, date: string) =>
+      `Logged by ${reporter}, played ${date}. One of the players can no longer respond, so it won’t confirm itself.`,
     members: 'Members',
     member: 'Member',
     joined: 'Joined',
@@ -893,6 +896,7 @@ export const en = {
       'auth.wrong_current_password': 'Your current password is incorrect.',
       'auth.not_logged_in': 'Please log in again.',
       'auth.session_expired': 'Your session expired. Please log in again.',
+      'auth.refresh_raced': 'Your session was just renewed in another tab. Try again.',
       'auth.too_many_signups': 'Too many sign-up attempts. Try again later.',
       'auth.locked': (p: Record<string, unknown>) => `Too many failed attempts. Try again in ${p.minutes ?? 15} minutes.`,
       'admin.cannot_change_self': "You can't change your own role or status.",

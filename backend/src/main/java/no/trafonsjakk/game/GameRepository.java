@@ -30,19 +30,19 @@ public interface GameRepository extends JpaRepository<Game, Long> {
 
     List<Game> findByStatusOrderByCreatedAtDesc(GameStatus status);
 
-    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.PENDING and g.createdAt < :cutoff")
+    /** Old enough to confirm itself, and both players can still object (their accounts are active). */
+    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.PENDING and g.createdAt < :cutoff "
+            + "and g.white.enabled = true and g.black.enabled = true")
     List<Game> findOverduePending(@Param("cutoff") Instant cutoff);
 
     @Query("select count(g) > 0 from Game g where g.status = no.trafonsjakk.game.GameStatus.PENDING "
-            + "and g.createdAt < :cutoff")
+            + "and g.createdAt < :cutoff and g.white.enabled = true and g.black.enabled = true")
     boolean existsOverduePending(@Param("cutoff") Instant cutoff);
 
-    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.CONFIRMED "
-            + "and (g.white.id = :playerId or g.black.id = :playerId) order by g.playedAt asc, g.id asc")
-    List<Game> findConfirmedForPlayer(@Param("playerId") Long playerId);
-
-    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.CONFIRMED")
-    List<Game> findAllConfirmed();
+    /** Pending games that will never confirm themselves: a player's account is disabled or deleted. */
+    @Query("select g from Game g where g.status = no.trafonsjakk.game.GameStatus.PENDING "
+            + "and (g.white.enabled = false or g.black.enabled = false) order by g.createdAt asc")
+    List<Game> findPendingWithInactivePlayer();
 
     /** Confirmed games played in [from, to), oldest first. */
     @Query("select g from Game g join fetch g.white join fetch g.black "

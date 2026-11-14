@@ -45,6 +45,12 @@ public class AdminController {
         return games.disputed(CurrentUser.of(jwt));
     }
 
+    /** Pending results that won't confirm themselves because a player's account is disabled or deleted. */
+    @GetMapping("/games/held")
+    List<GameDto> held(@AuthenticationPrincipal Jwt jwt) {
+        return games.held(CurrentUser.of(jwt));
+    }
+
     @PostMapping("/games/{id}/resolve")
     GameDto resolve(@PathVariable long id, @Valid @RequestBody ResolveRequest req, @AuthenticationPrincipal Jwt jwt) {
         return games.resolve(id, req, CurrentUser.of(jwt));

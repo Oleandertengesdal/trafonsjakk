@@ -62,6 +62,20 @@ async function ensureCsrf(): Promise<void> {
   return csrfPromise
 }
 
+/** The server's answer when another tab refreshed with the same token a moment earlier. */
+const REFRESH_RACED = 'auth.refresh_raced'
+
+async function errorCode(res: Response): Promise<string | null> {
+  try {
+    const body: unknown = await res.json()
+    return typeof body === 'object' && body !== null && typeof (body as { code?: unknown }).code === 'string'
+      ? (body as { code: string }).code
+      : null
+  } catch {
+    return null
+  }
+}
+
 let refreshPromise: Promise<boolean> | null = null
 async function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
@@ -72,7 +86,14 @@ async function refreshSession(): Promise<boolean> {
         credentials: 'same-origin',
         headers: { 'X-XSRF-TOKEN': readCookie(CSRF_COOKIE) ?? '' },
       })
-      return res.ok
+      if (res.ok) return true
+      // Lost a race with another tab: its new cookies are in this browser too (or about to be), so the
+      // session is fine. Give them a moment to land and let the caller retry instead of signing out.
+      if (res.status === 401 && (await errorCode(res)) === REFRESH_RACED) {
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        return true
+      }
+      return false
     } catch {
       return false
     } finally {

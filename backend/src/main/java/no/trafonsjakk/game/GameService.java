@@ -2,12 +2,14 @@ package no.trafonsjakk.game;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import no.trafonsjakk.common.ApiException;
 import no.trafonsjakk.common.CurrentUser;
+import no.trafonsjakk.config.AppProperties;
 import no.trafonsjakk.game.GameDtos.CreateGameRequest;
 import no.trafonsjakk.game.GameDtos.GameDto;
 import no.trafonsjakk.game.GameDtos.ResolveAction;
@@ -39,9 +41,12 @@ public class GameService {
     private final TournamentService tournaments;
     private final RatingService ratings;
     private final GameMapper mapper;
+    private final AppProperties props;
 
     public GameService(GameRepository games, UserRepository users, TournamentMatchRepository matches,
-                       TournamentService tournaments, RatingService ratings, GameMapper mapper) {
+                       TournamentService tournaments, RatingService ratings, GameMapper mapper,
+                       AppProperties props) {
+        this.props = props;
         this.games = games;
         this.users = users;
         this.matches = matches;
@@ -86,6 +91,15 @@ public class GameService {
         return mapper.toDtos(games.findByStatusOrderByCreatedAtDesc(GameStatus.DISPUTED), actor);
     }
 
+    /**
+     * Pending results where a player's account is disabled or deleted. They're never auto-confirmed
+     * (that player can't object any more), so an admin confirms or voids them.
+     */
+    @Transactional(readOnly = true)
+    public List<GameDto> held(CurrentUser actor) {
+        return mapper.toDtos(games.findPendingWithInactivePlayer(), actor);
+    }
+
     // ---- commands ------------------------------------------------------------------------------
 
     @Transactional
@@ -101,6 +115,10 @@ public class GameService {
             throw ApiException.badRequest("game.in_future", "The game can't be in the future");
         }
         if (req.playedAt().isBefore(EARLIEST)) {
+            throw ApiException.badRequest("game.too_old", "That date is too far in the past");
+        }
+        // A back-dated game replays every rating after it, so members log recent games; an admin enters old ones.
+        if (!actor.admin() && req.playedAt().isBefore(now.minus(props.games().maxBackdate()))) {
             throw ApiException.badRequest("game.too_old", "That date is too far in the past");
         }
         // An admin may finish a tournament match for someone disabled midway (e.g. a forfeit);
@@ -204,6 +222,7 @@ public class GameService {
 
     /**
      * Confirms PENDING games older than the auto-confirm window. Called by {@link AutoConfirmService}.
+     * Games with a disabled or deleted player are left for an admin (see {@link #held}).
      * Returns the number of games confirmed.
      */
     @Transactional
@@ -213,6 +232,7 @@ public class GameService {
             return 0;
         }
         Instant now = Instant.now();
+        Instant earliest = overdue.stream().map(Game::getPlayedAt).min(Comparator.naturalOrder()).orElseThrow();
         for (Game g : overdue) {
             g.confirm(null, now);
         }
@@ -222,18 +242,19 @@ public class GameService {
                 tournaments.reevaluateMatch(g.getMatch().getId());
             }
         }
-        ratings.recomputeAll();
+        ratings.recomputeFrom(earliest);
         return overdue.size();
     }
 
     // ---- helpers -------------------------------------------------------------------------------
 
     private void afterConfirmedSetChanged(Game game) {
+        Instant playedAt = game.getPlayedAt();
         games.flush();
         if (game.getMatch() != null) {
             tournaments.reevaluateMatch(game.getMatch().getId());
         }
-        ratings.recomputeAll(); // clears the persistence context
+        ratings.recomputeFrom(playedAt); // clears the persistence context
     }
 
     private GameDto reload(long id, CurrentUser actor) {

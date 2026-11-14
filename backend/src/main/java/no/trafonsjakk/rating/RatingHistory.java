@@ -7,7 +7,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import org.hibernate.annotations.Immutable;
 
-/** Read-only view of a rating change. Rows are written in bulk by {@link RatingService#recomputeAll()}. */
+/** Read-only view of a rating change. Rows are written in bulk by {@link RatingService}. */
 @Entity
 @Immutable
 @Table(name = "rating_history")

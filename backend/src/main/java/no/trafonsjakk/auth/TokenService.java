@@ -30,6 +30,8 @@ public class TokenService {
     private static final Logger log = LoggerFactory.getLogger(TokenService.class);
     /** Two tabs refreshing at the same moment shouldn't be treated as theft. */
     private static final Duration REUSE_GRACE = Duration.ofSeconds(20);
+    /** The token was rotated a moment ago by another tab; the session is fine, only this request lost the race. */
+    public static final String REFRESH_RACED = "auth.refresh_raced";
 
     public record IssuedTokens(String accessToken, String refreshToken, User user) {
     }
@@ -93,8 +95,11 @@ public class TokenService {
             if (token.getRevokedAt().isBefore(now.minus(REUSE_GRACE))) {
                 log.warn("Refresh token reuse detected for user {}; revoking token family", token.getUserId());
                 refreshTokens.revokeFamily(token.getFamilyId(), now);
+                throw ApiException.unauthorized("auth.session_expired", "Session expired");
             }
-            throw ApiException.unauthorized("auth.session_expired", "Session expired");
+            // No new tokens here either, so replaying a stolen token gains nothing. But the caller must
+            // not clear the cookies: the other tab's fresh ones are already in the same browser.
+            throw ApiException.unauthorized(REFRESH_RACED, "The session was just refreshed");
         }
         if (token.getExpiresAt().isBefore(now)) {
             throw ApiException.unauthorized("auth.session_expired", "Session expired");

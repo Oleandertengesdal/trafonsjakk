@@ -26,7 +26,7 @@ export const queryClient = new QueryClient({
 /** Everything that changes when a game is logged/confirmed: refetch it all. */
 export function invalidateResults() {
   return Promise.all(
-    ['games', 'pending', 'leaderboard', 'stats', 'profile', 'tournaments', 'tournament', 'myMatches', 'me', 'disputed'].map(
+    ['games', 'pending', 'leaderboard', 'stats', 'profile', 'tournaments', 'tournament', 'myMatches', 'me', 'disputed', 'held'].map(
       (key) => queryClient.invalidateQueries({ queryKey: [key] }),
     ),
   )

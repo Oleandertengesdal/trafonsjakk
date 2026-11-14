@@ -55,9 +55,9 @@ public class UserService {
     public TokenService.IssuedTokens changePassword(CurrentUser actor, String current, String next, ClientAddress from) {
         User u = me(actor);
         // Someone holding a stolen session must not be able to guess the password here faster than at the login.
-        attempts.assertLoginAllowed(u.getUsername(), from);
+        attempts.assertPasswordCheckAllowed(u.getId());
         if (!passwordEncoder.matches(current, u.getPasswordHash())) {
-            attempts.recordFailure(u.getUsername(), from);
+            attempts.recordPasswordCheckFailure(u.getId(), u.getUsername(), from);
             throw ApiException.badRequest("auth.wrong_current_password", "Your current password is incorrect");
         }
         if (next.getBytes(StandardCharsets.UTF_8).length > 72) {

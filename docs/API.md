@@ -237,6 +237,7 @@ A game being played right now. A player (or an admin) records it on a phone: eve
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/admin/games/disputed` | |
+| GET | `/admin/games/held` | Pending results that won't auto-confirm because a player's account is disabled or deleted. |
 | POST | `/admin/games/{id}/resolve` | `{ action: "CONFIRM"|"VOID", result? }`. Works on pending, disputed and confirmed games; `result` corrects the outcome. |
 | GET | `/admin/users` | |
 | PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself, and a deleted account can't be changed (`admin.user_deleted`; `AdminUser.deleted` is true). Disabling also cancels their unused invite codes and open password links. |

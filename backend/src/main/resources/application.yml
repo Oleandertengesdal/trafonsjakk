@@ -26,6 +26,8 @@ spring:
           batch_size: 50
         order_inserts: true
         order_updates: true
+        # Lazy players, matches and tournaments of a list are loaded together, not one query each
+        default_batch_fetch_size: 50
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -68,6 +70,8 @@ app:
   bootstrap-invite-code: ${BOOTSTRAP_INVITE_CODE:}
   games:
     auto-confirm-after: 48h
+    # How far back a member may date a game they log. Admins have no limit (old games, corrections).
+    max-backdate: 30d
   awards:
     # Months follow Norwegian time. A month is decided this long after it ends, so late confirmations count.
     zone: Europe/Oslo

@@ -299,7 +299,7 @@ stateDiagram-v2
 - Only the two players (or an admin) may log a game.
 - If a player logged it, **the other player** confirms. If an admin logged it on behalf of two others, **either** player may confirm.
 - Only `CONFIRMED` games affect ratings, statistics and tournaments.
-- **Auto-confirm:** a scheduled job runs every 10 minutes and confirms `PENDING` games older than 48 h. Free hosting sleeps when idle, so the same sweep also runs on startup and before game, leaderboard, profile, tournament and awards reads. That makes it correct even if the scheduler never fired.
+- **Auto-confirm:** a scheduled job runs every 10 minutes and confirms `PENDING` games older than 48 h. Free hosting sleeps when idle, so the same sweep also runs on startup and before game, leaderboard, profile, tournament and awards reads. That makes it correct even if the scheduler never fired. A result is never auto-confirmed while one of its players has a disabled or deleted account (they can no longer object): it stays pending and shows on the admin page (`GET /api/admin/games/held`) for an admin to confirm or void.
 
 ### 3.4 Rating engine: Glicko-2
 
@@ -334,7 +334,7 @@ The implementation is verified against the worked example in Glickman's paper (1
 3. replays all `CONFIRMED` games ordered by `(played_at, id)`,
 4. rewrites `rating_history` and the cached rating columns on `users` in one transaction.
 
-For a friend group (hundreds to a few thousand games) this takes milliseconds. It makes back-dated games, late confirmations and voids exactly correct. If the group ever reaches ~50k games, switch to an incremental update for games that land at the end of the timeline.
+For a friend group (hundreds to a few thousand games) this takes milliseconds. It makes back-dated games, late confirmations and voids exactly correct. The replay always covers every game, but a confirmation calls `recomputeFrom(playedAt)`, which only rewrites the `rating_history` rows from that game's date onwards (earlier rows can't have changed); the admin "recompute" button still rewrites everything. Members can date a game at most `app.games.max-backdate` (30 days) back, so the rewritten part stays small; admins have no limit.
 
 ### 3.5 Tournament engine
 

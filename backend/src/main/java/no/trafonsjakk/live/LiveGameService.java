@@ -13,6 +13,7 @@ import no.trafonsjakk.live.LiveDtos.LiveGameDto;
 import no.trafonsjakk.live.LiveDtos.StartLiveRequest;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,16 +38,29 @@ public class LiveGameService {
         this.games = games;
     }
 
-    @Transactional
+    // The two reads below are polled every few seconds by everyone watching (and by the TV screen), so
+    // they only read: games left behind are filtered out here and marked ABANDONED by the sweep below.
+
+    @Transactional(readOnly = true)
     public List<LiveGameDto> running(CurrentUser actor) {
-        live.abandonIdleSince(Instant.now().minus(IDLE_LIMIT));
-        return live.findRunning().stream().map(g -> LiveGameDto.of(g, actor)).toList();
+        return live.findRunning(Instant.now().minus(IDLE_LIMIT)).stream().map(g -> LiveGameDto.of(g, actor)).toList();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public LiveGameDto get(long id, CurrentUser actor) {
+        LiveGame g = live.findWithPlayers(id).orElseThrow(LiveGameService::notFound);
+        LiveGameDto dto = LiveGameDto.of(g, actor);
+        boolean leftBehind = g.getStatus() == LiveStatus.LIVE && g.getUpdatedAt().isBefore(Instant.now().minus(IDLE_LIMIT));
+        // Not swept yet: show it as what it is about to become
+        return !leftBehind ? dto : new LiveGameDto(dto.id(), dto.white(), dto.black(), LiveStatus.ABANDONED, dto.moves(),
+                dto.version(), dto.startedAt(), dto.updatedAt(), dto.gameId(), dto.canRecord());
+    }
+
+    /** Marks games nobody has saved for {@link #IDLE_LIMIT} as abandoned. Also done before a new game starts. */
+    @Scheduled(fixedDelayString = "PT10M", initialDelayString = "PT2M")
+    @Transactional
+    public void abandonIdle() {
         live.abandonIdleSince(Instant.now().minus(IDLE_LIMIT));
-        return LiveGameDto.of(live.findWithPlayers(id).orElseThrow(LiveGameService::notFound), actor);
     }
 
     @Transactional

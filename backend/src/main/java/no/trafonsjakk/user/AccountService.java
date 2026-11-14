@@ -94,9 +94,9 @@ public class AccountService {
     @Transactional
     public void delete(CurrentUser actor, String password, ClientAddress from) {
         User u = users.findById(actor.id()).orElseThrow(() -> ApiException.unauthorized("auth.not_logged_in", "Not logged in"));
-        attempts.assertLoginAllowed(u.getUsername(), from);
+        attempts.assertPasswordCheckAllowed(u.getId());
         if (password == null || !passwordEncoder.matches(password, u.getPasswordHash())) {
-            attempts.recordFailure(u.getUsername(), from);
+            attempts.recordPasswordCheckFailure(u.getId(), u.getUsername(), from);
             throw ApiException.badRequest("auth.wrong_current_password", "Your current password is incorrect");
         }
         if (u.getRole() == Role.ADMIN && users.countByRoleAndEnabledTrue(Role.ADMIN) <= 1) {

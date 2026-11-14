@@ -59,7 +59,7 @@ public class AutoConfirmService {
                 log.info("Auto-confirmed {} game(s)", n);
             }
         } catch (RuntimeException e) {
-            log.warn("Auto-confirm sweep failed: {}", e.getMessage());
+            log.warn("Auto-confirm sweep failed", e);
         }
     }
 }

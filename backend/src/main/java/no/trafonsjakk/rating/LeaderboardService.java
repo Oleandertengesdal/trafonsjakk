@@ -6,17 +6,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import no.trafonsjakk.game.Game;
-import no.trafonsjakk.game.GameRepository;
 import no.trafonsjakk.user.PlayerRef;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Leaderboard. Established players (RD ≤ 110) are ranked by rating; provisional players follow, unranked.
- * Aggregates in memory, which is plenty for a friend group.
+ * Wins, draws, losses and the recent trend are counted by the database, so a request never loads the
+ * games themselves (or their moves).
  */
 @Service
 public class LeaderboardService {
@@ -27,42 +27,58 @@ public class LeaderboardService {
 
     private static final int TREND_GAMES = 5;
 
-    private final UserRepository users;
-    private final GameRepository games;
-    private final RatingHistoryRepository history;
+    /** Wins, draws and losses per player over all confirmed games. */
+    private static final String RECORD_SQL = """
+            select user_id,
+                   count(*) filter (where score = 1)   as wins,
+                   count(*) filter (where score = 0.5) as draws,
+                   count(*) filter (where score = 0)   as losses
+            from (select white_id as user_id,
+                         case result when 'WHITE_WIN' then 1 when 'DRAW' then 0.5 else 0 end as score
+                  from games where status = 'CONFIRMED'
+                  union all
+                  select black_id as user_id,
+                         case result when 'BLACK_WIN' then 1 when 'DRAW' then 0.5 else 0 end as score
+                  from games where status = 'CONFIRMED') scores
+            group by user_id""";
 
-    public LeaderboardService(UserRepository users, GameRepository games, RatingHistoryRepository history) {
+    /** Per player: the rating after their latest game and the rating before the first of their last few. */
+    private static final String TREND_SQL = """
+            select user_id,
+                   max(rating_after) filter (where rn = 1)    as last_after,
+                   max(rating_before) filter (where rn = span) as first_before
+            from (select user_id, rating_before, rating_after,
+                         row_number() over (partition by user_id order by played_at desc, game_id desc) as rn,
+                         least(count(*) over (partition by user_id), ?) as span
+                  from rating_history) recent
+            where rn <= span
+            group by user_id""";
+
+    /** Empty when the player is disabled or provisional. */
+    private static final String RANK_SQL = """
+            select 1 + (select count(*) from users o
+                        where o.enabled and o.rating_deviation <= ? and o.rating > u.rating) as rank
+            from users u
+            where u.id = ? and u.enabled and u.rating_deviation <= ?""";
+
+    private final UserRepository users;
+    private final JdbcTemplate jdbc;
+
+    public LeaderboardService(UserRepository users, JdbcTemplate jdbc) {
         this.users = users;
-        this.games = games;
-        this.history = history;
+        this.jdbc = jdbc;
     }
 
     @Transactional(readOnly = true)
     public List<Row> leaderboard() {
         Map<Long, int[]> wdl = new HashMap<>();
-        for (Game g : games.findAllConfirmed()) {
-            long w = g.getWhite().getId();
-            long b = g.getBlack().getId();
-            switch (g.getResult()) {
-                case WHITE_WIN -> {
-                    wdl.computeIfAbsent(w, k -> new int[3])[0]++;
-                    wdl.computeIfAbsent(b, k -> new int[3])[2]++;
-                }
-                case BLACK_WIN -> {
-                    wdl.computeIfAbsent(b, k -> new int[3])[0]++;
-                    wdl.computeIfAbsent(w, k -> new int[3])[2]++;
-                }
-                case DRAW -> {
-                    wdl.computeIfAbsent(w, k -> new int[3])[1]++;
-                    wdl.computeIfAbsent(b, k -> new int[3])[1]++;
-                }
-            }
-        }
-
-        Map<Long, List<RatingHistory>> byUser = new HashMap<>();
-        for (RatingHistory h : history.findAllOrdered()) {
-            byUser.computeIfAbsent(h.getUserId(), k -> new ArrayList<>()).add(h);
-        }
+        jdbc.query(RECORD_SQL, rs -> {
+            wdl.put(rs.getLong("user_id"), new int[]{rs.getInt("wins"), rs.getInt("draws"), rs.getInt("losses")});
+        });
+        Map<Long, Integer> trends = new HashMap<>();
+        jdbc.query(TREND_SQL, rs -> {
+            trends.put(rs.getLong("user_id"), (int) Math.round(rs.getDouble("last_after") - rs.getDouble("first_before")));
+        }, TREND_GAMES);
 
         List<User> all = new ArrayList<>(users.findByEnabledTrueOrderByRatingDesc());
         all.sort(Comparator.comparing(User::isProvisional).thenComparing(Comparator.comparingDouble(User::getRating).reversed()));
@@ -71,15 +87,9 @@ public class LeaderboardService {
         int rank = 0;
         for (User u : all) {
             int[] r = wdl.getOrDefault(u.getId(), new int[3]);
-            List<RatingHistory> hs = byUser.getOrDefault(u.getId(), List.of());
-            int trend = 0;
-            if (!hs.isEmpty()) {
-                RatingHistory last = hs.getLast();
-                RatingHistory from = hs.get(Math.max(0, hs.size() - TREND_GAMES));
-                trend = (int) Math.round(last.getRatingAfter() - from.getRatingBefore());
-            }
             Integer rk = u.isProvisional() ? null : ++rank;
-            rows.add(new Row(rk, PlayerRef.of(u), r[0] + r[1] + r[2], r[0], r[1], r[2], u.getLastGameAt(), trend));
+            rows.add(new Row(rk, PlayerRef.of(u), r[0] + r[1] + r[2], r[0], r[1], r[2], u.getLastGameAt(),
+                    trends.getOrDefault(u.getId(), 0)));
         }
         return rows;
     }
@@ -87,16 +97,8 @@ public class LeaderboardService {
     /** Rank among established players, or null if provisional/disabled. */
     @Transactional(readOnly = true)
     public Integer rankOf(long userId) {
-        int rank = 0;
-        for (User u : users.findByEnabledTrueOrderByRatingDesc()) {
-            if (u.isProvisional()) {
-                continue;
-            }
-            rank++;
-            if (u.getId() == userId) {
-                return rank;
-            }
-        }
-        return null;
+        List<Integer> rank = jdbc.query(RANK_SQL, (rs, i) -> rs.getInt("rank"),
+                Glicko2.PROVISIONAL_RD, userId, Glicko2.PROVISIONAL_RD);
+        return rank.isEmpty() ? null : rank.getFirst();
     }
 }

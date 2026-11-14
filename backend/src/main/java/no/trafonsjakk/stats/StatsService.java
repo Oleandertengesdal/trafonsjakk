@@ -8,8 +8,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import no.trafonsjakk.common.ApiException;
-import no.trafonsjakk.game.Game;
-import no.trafonsjakk.game.GameRepository;
+import no.trafonsjakk.game.GameResult;
 import no.trafonsjakk.rating.LeaderboardService;
 import no.trafonsjakk.rating.RatingHistory;
 import no.trafonsjakk.rating.RatingHistoryRepository;
@@ -21,6 +20,7 @@ import no.trafonsjakk.user.PlayerRef;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserDtos.Profile;
 import no.trafonsjakk.user.UserRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,16 +68,20 @@ public class StatsService {
                         long tournamentWins) {
     }
 
+    /** A confirmed game as the statistics need it: no moves, no notes, no loaded players. */
+    private record PlayedGame(long id, Instant playedAt, long whiteId, long blackId, GameResult result, String opening) {
+    }
+
     private final UserRepository users;
-    private final GameRepository games;
+    private final JdbcTemplate jdbc;
     private final RatingHistoryRepository history;
     private final TournamentRepository tournaments;
     private final LeaderboardService leaderboard;
 
-    public StatsService(UserRepository users, GameRepository games, RatingHistoryRepository history,
+    public StatsService(UserRepository users, JdbcTemplate jdbc, RatingHistoryRepository history,
                         TournamentRepository tournaments, LeaderboardService leaderboard) {
         this.users = users;
-        this.games = games;
+        this.jdbc = jdbc;
         this.history = history;
         this.tournaments = tournaments;
         this.leaderboard = leaderboard;
@@ -99,26 +103,32 @@ public class StatsService {
     public Stats stats(String username) {
         User me = find(username);
         long myId = me.getId();
-        List<Game> myGames = games.findConfirmedForPlayer(myId);
+        List<PlayedGame> myGames = jdbc.query("""
+                        select id, played_at, white_id, black_id, result, opening from games
+                        where status = 'CONFIRMED' and (white_id = ? or black_id = ?)
+                        order by played_at, id""",
+                (rs, i) -> new PlayedGame(rs.getLong("id"), rs.getTimestamp("played_at").toInstant(), rs.getLong("white_id"),
+                        rs.getLong("black_id"), GameResult.valueOf(rs.getString("result")), rs.getString("opening")),
+                myId, myId);
         Map<Long, User> people = users.findAll().stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
         // Pre-game ratings of both players for every game (for "best win")
         Map<Long, Map<Long, Double>> before = new HashMap<>();
         if (!myGames.isEmpty()) {
-            for (RatingHistory h : history.findByGameIdIn(myGames.stream().map(Game::getId).toList())) {
+            for (RatingHistory h : history.findByGameIdIn(myGames.stream().map(PlayedGame::id).toList())) {
                 before.computeIfAbsent(h.getGameId(), k -> new HashMap<>()).put(h.getUserId(), h.getRatingBefore());
             }
         }
 
         List<GameRecord> records = new ArrayList<>(myGames.size());
-        Map<Long, Game> gameById = new HashMap<>();
-        for (Game g : myGames) {
-            Map<Long, Double> b = before.getOrDefault(g.getId(), Map.of());
-            long w = g.getWhite().getId();
-            long bl = g.getBlack().getId();
-            records.add(new GameRecord(g.getId(), g.getPlayedAt(), w, bl, g.getResult().whiteScore(),
-                    g.getOpening(), b.get(w), b.get(bl)));
-            gameById.put(g.getId(), g);
+        Map<Long, PlayedGame> gameById = new HashMap<>();
+        for (PlayedGame g : myGames) {
+            Map<Long, Double> b = before.getOrDefault(g.id(), Map.of());
+            long w = g.whiteId();
+            long bl = g.blackId();
+            records.add(new GameRecord(g.id(), g.playedAt(), w, bl, g.result().whiteScore(),
+                    g.opening(), b.get(w), b.get(bl)));
+            gameById.put(g.id(), g);
         }
         PlayerStatsCalculator.Result r = PlayerStatsCalculator.compute(myId, records, Instant.now());
 
@@ -127,14 +137,14 @@ public class StatsService {
         int peak = 1500;
         int lowest = 1500;
         for (RatingHistory h : history.findForUser(myId)) {
-            Game g = gameById.get(h.getGameId());
+            PlayedGame g = gameById.get(h.getGameId());
             String opponent = null;
             String res = null;
             if (g != null) {
-                boolean white = g.getWhite().getId() == myId;
-                User opp = white ? g.getBlack() : g.getWhite();
-                opponent = opp.getUsername();
-                double s = white ? g.getResult().whiteScore() : 1 - g.getResult().whiteScore();
+                boolean white = g.whiteId() == myId;
+                User opp = people.get(white ? g.blackId() : g.whiteId());
+                opponent = opp == null ? null : opp.getUsername();
+                double s = white ? g.result().whiteScore() : 1 - g.result().whiteScore();
                 res = s == 1 ? "W" : s == 0.5 ? "D" : "L";
             }
             int rating = (int) Math.round(h.getRatingAfter());

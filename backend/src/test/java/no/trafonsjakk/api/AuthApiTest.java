@@ -158,6 +158,23 @@ class AuthApiTest extends IntegrationTest {
     }
 
     @Test
+    void aRefreshThatLosesTheRaceWithAnotherTabDoesNotClearTheNewCookies() {
+        Player admin = registerAdmin();
+        String oldRefresh = admin.api().cookie("tf_rt").orElseThrow();
+        assertThat(admin.api().post("/api/auth/refresh").status()).isEqualTo(204);
+
+        // The other tab sent the same token a moment later
+        ApiSession otherTab = session();
+        otherTab.setCookie("tf_rt", oldRefresh, "/api/auth");
+        Response late = otherTab.post("/api/auth/refresh");
+        assertThat(late.status()).isEqualTo(401);
+        assertThat(late.code()).isEqualTo("auth.refresh_raced");
+        assertThat(late.setCookie("tf_rt")).as("the cookies the first tab just got stay").isEmpty();
+        assertThat(late.setCookie("tf_at")).isEmpty();
+        assertThat(admin.api().get("/api/auth/me").status()).isEqualTo(200);
+    }
+
+    @Test
     void logoutRevokesTheRefreshToken() {
         Player admin = registerAdmin();
         String refresh = admin.api().cookie("tf_rt").orElseThrow();

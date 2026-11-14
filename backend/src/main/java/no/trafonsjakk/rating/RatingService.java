@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Rebuilds every rating from scratch by replaying all CONFIRMED games in order of play.
  * <p>
  * Called whenever the set of confirmed games changes. Correct for back-dated, late-confirmed,
- * corrected and voided games, and fast enough for a friend group (milliseconds for thousands of games).
+ * corrected and voided games. The replay itself is in memory (milliseconds for thousands of games);
+ * {@link #recomputeFrom} then stores only the part of the history that can have changed.
  * A PostgreSQL advisory lock serialises concurrent recomputes.
  */
 @Service
@@ -50,6 +52,22 @@ public class RatingService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public RecomputeSummary recomputeAll() {
+        return recompute(null);
+    }
+
+    /**
+     * The same replay, but only the stored history from {@code since} onwards is rewritten. A game can't
+     * change anything that happened before it was played, so the earlier rows are already right; this
+     * keeps a confirmation cheap however long the history gets. Pass the time the changed game was played
+     * (the earliest, if several). Same transaction rules as {@link #recomputeAll()}.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public RecomputeSummary recomputeFrom(Instant since) {
+        // The database keeps microseconds; rounding down can only widen what is rewritten
+        return recompute(since.truncatedTo(ChronoUnit.MICROS));
+    }
+
+    private RecomputeSummary recompute(Instant since) {
         long start = System.nanoTime();
         em.flush();
         jdbc.execute("SELECT pg_advisory_xact_lock(" + ADVISORY_LOCK_KEY + ")");
@@ -82,8 +100,10 @@ public class RatingService {
             Rating w2 = glicko.update(w, b, g.whiteScore());
             Rating b2 = glicko.update(b, w, 1.0 - g.whiteScore());
 
-            history.add(row(g, g.white(), w, w2));
-            history.add(row(g, g.black(), b, b2));
+            if (since == null || !g.playedAt().isBefore(since)) {
+                history.add(row(g, g.white(), w, w2));
+                history.add(row(g, g.black(), b, b2));
+            }
 
             ratings.put(g.white(), w2);
             ratings.put(g.black(), b2);
@@ -100,7 +120,11 @@ public class RatingService {
             }
         }
 
-        jdbc.update("DELETE FROM rating_history");
+        if (since == null) {
+            jdbc.update("DELETE FROM rating_history");
+        } else {
+            jdbc.update("DELETE FROM rating_history WHERE played_at >= ?", Timestamp.from(since));
+        }
         jdbc.batchUpdate("INSERT INTO rating_history (game_id, user_id, rating_before, rating_after, rd_before, "
                 + "rd_after, volatility_after, played_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", history);
 

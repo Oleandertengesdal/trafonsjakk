@@ -124,6 +124,46 @@ export function uciToSan(fen: string, uci: string): string | null {
   }
 }
 
+/** One of the engine's best continuations while it searches a position (live analysis). */
+export interface EngineLine {
+  /** 1 for the engine's first choice, 2 for the second, … */
+  rank: number
+  depth: number
+  score: Score
+  /** The moves, as UCI ("e2e4"). */
+  pv: string[]
+}
+
+/**
+ * Parses a UCI "info depth 18 … multipv 2 score cp 31 … pv e2e4 e7e5" line into an EngineLine, given
+ * whose turn it is. Returns null for anything else, including bounds (not a real score yet).
+ */
+export function parseInfoLine(line: string, toMove: 'w' | 'b'): EngineLine | null {
+  if (!line.startsWith('info ') || / (upper|lower)bound\b/.test(line)) return null
+  const pvAt = line.indexOf(' pv ')
+  const depth = /\bdepth (\d+)/.exec(line)
+  const score = scoreFromInfo(line, toMove)
+  if (pvAt < 0 || !depth || !score) return null
+  const rank = /\bmultipv (\d+)/.exec(line)
+  const pv = line.slice(pvAt + 4).trim().split(/\s+/).filter((m) => /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(m))
+  return pv.length ? { rank: rank ? Number(rank[1]) : 1, depth: Number(depth[1]), score, pv } : null
+}
+
+/** A line of UCI moves from `fen` as SAN, stopping at `max` moves or at the first move that isn't legal. */
+export function pvToSan(fen: string, pv: string[], max = 10): string[] {
+  const out: string[] = []
+  try {
+    const chess = new Chess(fen)
+    for (const uci of pv.slice(0, max)) {
+      const move = chess.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.length > 4 ? uci[4] : undefined })
+      out.push(move.san)
+    }
+  } catch {
+    // An illegal move (a stale line for another position): keep what was legal
+  }
+  return out
+}
+
 /** Reviews a game from evaluations of all its positions (`evals[i]` is the position after `i` moves). */
 export function reviewGame(sans: string[], evals: PositionEval[]): GameReview {
   const pos = positions(sans)

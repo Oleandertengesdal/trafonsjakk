@@ -7,7 +7,6 @@ import { liveApi } from '../api/endpoints'
 import { invalidateResults } from '../api/queryClient'
 import type { GameResult, LiveGame } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
-import { formatMoves, parseMoves } from '../chess/moves'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Dialog } from '../components/ui/Dialog'
@@ -23,7 +22,7 @@ import { useErrorText } from '../i18n/useErrorText'
 import { NotFoundPage } from './NotFoundPage'
 
 const MoveRecorder = lazy(() => import('../components/chess/MoveRecorder'))
-const LiveBoard = lazy(() => import('../components/chess/LiveBoard'))
+const LiveSpectator = lazy(() => import('../components/chess/LiveSpectator'))
 
 const boardFallback = <Skeleton className="aspect-square w-full" />
 
@@ -61,7 +60,11 @@ export function LiveGamePage() {
         }
         action={g.status === 'LIVE' ? <LiveDot label={t.live.liveBadge} /> : undefined}
       />
-      {g.status !== 'LIVE' ? <Ended game={g} /> : g.canRecord ? <Recorder game={g} /> : <Follow game={g} />}
+      {g.status !== 'LIVE' ? <Ended game={g} /> : g.canRecord ? <Recorder game={g} /> : (
+        <Suspense fallback={boardFallback}>
+          <LiveSpectator game={g} />
+        </Suspense>
+      )}
     </div>
   )
 }
@@ -91,34 +94,7 @@ function Ended({ game }: { game: LiveGame }) {
   )
 }
 
-function MoveList({ moves }: { moves: string | null }) {
-  const sans = parseMoves(moves ?? '').sans
-  const l = useI18n().t.live
-  return (
-    <p className="text-[0.9375rem] leading-relaxed text-muted">
-      {sans.length === 0 ? l.moveCount(0) : formatMoves(sans)}
-    </p>
-  )
-}
 
-function Follow({ game }: { game: LiveGame }) {
-  const l = useI18n().t.live
-  return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,34rem)_1fr]">
-      <div className="overflow-hidden rounded-control border border-line">
-        <Suspense fallback={boardFallback}>
-          <LiveBoard id="live-follow" moves={game.moves} />
-        </Suspense>
-      </div>
-      <Panel className="self-start" title={l.moveCount(Math.ceil(parseMoves(game.moves ?? '').sans.length / 2))}>
-        <div className="flex flex-col gap-3 px-5 pt-1 pb-5">
-          <MoveList moves={game.moves} />
-          <p className="text-sm text-faint">{l.following}</p>
-        </div>
-      </Panel>
-    </div>
-  )
-}
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'failed'
 

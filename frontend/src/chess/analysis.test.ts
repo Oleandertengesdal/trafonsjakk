@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   moveAccuracy,
+  parseInfoLine,
+  pvToSan,
   positions,
   reviewGame,
   scoreFromInfo,
@@ -139,5 +141,25 @@ describe('reviewGame', () => {
     ])
     expect(stillWon.moves[0].missedMate).toBe(2)
     expect(stillWon.moves[0].judgement).toBeNull()
+  })
+
+  it('reads the live search lines Stockfish prints', () => {
+    expect(parseInfoLine('info depth 18 seldepth 24 multipv 2 score cp 31 nodes 9 nps 1 pv e2e4 e7e5 g1f3', 'w')).toEqual({
+      rank: 2,
+      depth: 18,
+      score: { cp: 31 },
+      pv: ['e2e4', 'e7e5', 'g1f3'],
+    })
+    expect(parseInfoLine('info depth 5 score mate 2 pv h5f7', 'b')).toEqual({ rank: 1, depth: 5, score: { mate: 2, by: 'b' }, pv: ['h5f7'] })
+    expect(parseInfoLine('info depth 18 multipv 1 score cp 31 lowerbound pv e2e4', 'w')).toBeNull()
+    expect(parseInfoLine('info depth 18 currmove e2e4 currmovenumber 1', 'w')).toBeNull()
+    expect(parseInfoLine('info string NNUE evaluation enabled', 'w')).toBeNull()
+  })
+
+  it('writes an engine line as moves, up to the first one that isn’t legal', () => {
+    const start = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    expect(pvToSan(start, ['e2e4', 'e7e5', 'g1f3', 'b8c6'])).toEqual(['e4', 'e5', 'Nf3', 'Nc6'])
+    expect(pvToSan(start, ['e2e4', 'e7e5', 'e1e3'])).toEqual(['e4', 'e5'])
+    expect(pvToSan(start, ['e2e4', 'e7e5', 'g1f3'], 2)).toEqual(['e4', 'e5'])
   })
 })

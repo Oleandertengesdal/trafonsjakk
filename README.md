@@ -10,7 +10,7 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 
 - **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
 - **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
-- **Live games:** start a game when you sit down, record each move on a phone as you play (saved straight away), and tap the result at the end. Everyone else follows the board as it happens. Moves stay optional.
+- **Live games:** start a game when you sit down, record each move on a phone as you play (saved straight away), and tap the result at the end. Everyone else follows the board as it happens, can step back through the moves, and can switch on live Stockfish analysis (players don't get it during their own game). Moves stay optional.
 - **TV mode:** a full-screen, read-only scoreboard for a big screen at the venue, with the live boards, the ratings and the latest results.
 - **Installable app:** add it to the home screen of a phone or tablet and it opens full screen, without the browser bar. The screen stays on during a live game.
 - **Your own data:** download everything stored about you, or delete your account (your games stay, under "Slettet spiller", because they're part of your opponents' ratings).

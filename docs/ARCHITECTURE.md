@@ -392,6 +392,8 @@ Two awards per calendar month (Norwegian time), from confirmed games only:
 
 `live_games` holds games being played right now (V5). The design is deliberately simple because the free API sleeps and has one instance: no WebSockets, just polling. The recorder saves the whole move text after every move with the version it last saw; the row is locked while saving (`findByIdForUpdate`) and an older version is refused with `live.out_of_date`, after which the phone takes the newer moves. Followers poll every 3 seconds, the TV every 4. Finishing goes through `GameService.create`, so the normal confirmation, rating and tournament rules apply unchanged. Idle games (6 hours without a save) are marked abandoned whenever live games are read.
 
+Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board follows the game, they can step back through the moves (and jump back to the live position, with a count of the moves they missed), and they can switch on Stockfish. The engine (the same in-browser Stockfish as the game analysis, `Engine.analyse`) searches whatever position is on the board to depth 20 with three lines (MultiPV), reporting as it deepens; a new move or stepping back stops the old search and starts a new one. The page shows an evaluation bar, an arrow for the best move and the three best continuations. **Fair play:** the players (and anyone recording the game) never get this view during the game, and the TV shows no evaluation, since players can see it. This is a guard in the interface, not a lock: a player could still open the page logged in as someone else.
+
 ### 3.10 Your data and deleting an account
 
 `AccountService.export` collects everything stored about the person with plain SQL. `delete` (password required, same lockout as login) keeps the games and rating history, because they are the opponents' history too, and removes what identifies the person: see [API.md](API.md#users). `users.deleted_at` marks it so an admin can't switch it back on, and `deleted_` usernames can't be registered.
@@ -453,7 +455,7 @@ On the frontend:
 | `/tournaments/:id` | Standings & fixtures (RR) or bracket (KO) | member |
 | `/invites` | Create / revoke invite codes | member |
 | `/live` | Games being played now, start a live game, link to TV mode | member |
-| `/live/:id` | A player records the moves on the board (saved after every move) and taps the result; others follow the board. Keeps the screen on. | member |
+| `/live/:id` | A player records the moves on the board (saved after every move) and taps the result. Spectators follow the board, step back through the moves, and can switch on live Stockfish analysis. Keeps the screen on. | member |
 | `/tv` | TV mode: full-screen, read-only scoreboard (live boards, ratings, latest results), always dark, keeps the screen on. Outside the app's navigation. | member |
 | `/settings` | Real name, password, language, light/dark, download your data, delete your account | member |
 | `/admin` | Disputes, users (role/enable, password links), recompute ratings | admin |

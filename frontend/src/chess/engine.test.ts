@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { EngineLine } from './analysis'
 import { Engine, type EngineWorker } from './engine'
 
 /** Answers like Stockfish over UCI. `script` maps a "go" to the lines the engine prints. */
@@ -53,5 +54,43 @@ describe('Engine', () => {
       queueMicrotask(() => this.onerror?.({ message: 'WebAssembly is not allowed' } as ErrorEvent))
     }
     await expect(Engine.load(() => w)).rejects.toThrow('WebAssembly is not allowed')
+  })
+
+  it('analyses live: several lines, and a new position stops the old search first', async () => {
+    const sent: string[] = []
+    const w: EngineWorker = {
+      onmessage: null,
+      onerror: null,
+      terminate() {},
+      postMessage(message: string) {
+        sent.push(message)
+        const say = (...lines: string[]) => queueMicrotask(() => lines.forEach((l) => w.onmessage?.({ data: l } as MessageEvent)))
+        if (message === 'uci') say('uciok')
+        else if (message === 'isready') say('readyok')
+        // A live search keeps going until told to stop
+        else if (message.startsWith('go'))
+          say('info depth 8 multipv 1 score cp 25 pv e7e5 g1f3', 'info depth 8 multipv 2 score cp 40 pv c7c5', 'info depth 9 multipv 1 score cp 30 upperbound pv e7e5')
+        else if (message === 'stop') say('bestmove e7e5')
+      },
+    }
+    const engine = await Engine.load(() => w)
+    const seen: EngineLine[] = []
+    await engine.analyse(BLACK_TO_MOVE, (line) => seen.push(line), { lines: 3, depth: 20 })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(sent).toContain('setoption name MultiPV value 3')
+    expect(sent).toContain('go depth 20')
+    // From White's side; the bound is ignored
+    expect(seen).toEqual([
+      { rank: 1, depth: 8, score: { cp: -25 }, pv: ['e7e5', 'g1f3'] },
+      { rank: 2, depth: 8, score: { cp: -40 }, pv: ['c7c5'] },
+    ])
+
+    const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+    await engine.analyse(START, () => {}, { lines: 3, depth: 20 })
+    const stopAt = sent.lastIndexOf('stop')
+    expect(stopAt).toBeGreaterThan(-1)
+    expect(sent.indexOf(`position fen ${START}`)).toBeGreaterThan(stopAt)
+    // MultiPV is only set when it changes
+    expect(sent.filter((m) => m.startsWith('setoption')).length).toBe(1)
   })
 })

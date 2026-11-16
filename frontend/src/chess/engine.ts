@@ -1,5 +1,5 @@
 // Talks to Stockfish (public/engine, GPLv3) running in a Web Worker, over the UCI text protocol.
-import { scoreFromInfo, type PositionEval } from './analysis'
+import { parseInfoLine, scoreFromInfo, type EngineLine, type PositionEval } from './analysis'
 
 export const ENGINE_URL = '/engine/stockfish-18-lite-single.js'
 export const ENGINE_NAME = 'Stockfish 18'
@@ -16,9 +16,17 @@ export interface EngineWorker {
   onerror: ((e: ErrorEvent) => void) | null
 }
 
+/** Live analysis: how deep to go and how many alternatives to show. Deep enough to be trusted, and it stops. */
+export const LIVE_DEPTH = 20
+export const LIVE_LINES = 3
+
 export class Engine {
   private lines: ((line: string) => void)[] = []
   private failure: ((e: Error) => void) | null = null
+  /** The search running now (live analysis), and the queue of positions waiting to be searched. */
+  private search: Promise<string> | null = null
+  private queue: Promise<void> = Promise.resolve()
+  private multiPv = 1
 
   private constructor(private readonly worker: EngineWorker) {
     worker.onmessage = (e: MessageEvent) => {
@@ -54,6 +62,42 @@ export class Engine {
 
   stop() {
     this.worker.postMessage('stop')
+  }
+
+  /**
+   * Searches `fen` until `depth`, calling `onLine` every time one of the best `lines` continuations
+   * improves. A new call stops the previous search first, so the newest position always wins.
+   */
+  analyse(fen: string, onLine: (line: EngineLine) => void, { depth = LIVE_DEPTH, lines = LIVE_LINES } = {}): Promise<void> {
+    const next = this.queue.then(async () => {
+      await this.halt()
+      if (lines !== this.multiPv) {
+        this.worker.postMessage(`setoption name MultiPV value ${lines}`)
+        this.multiPv = lines
+      }
+      const toMove = fen.split(' ')[1] === 'b' ? 'b' : 'w'
+      this.worker.postMessage(`position fen ${fen}`)
+      const search = this.until(`go depth ${depth}`, (line) => {
+        const info = parseInfoLine(line, toMove)
+        if (info) onLine(info)
+        return line.startsWith('bestmove')
+      })
+      this.search = search
+      search.then(
+        () => this.search === search && (this.search = null),
+        () => this.search === search && (this.search = null),
+      )
+    })
+    this.queue = next.catch(() => {})
+    return next
+  }
+
+  /** Stops the live search, if any, and waits until the engine has really stopped. */
+  async halt() {
+    const running = this.search
+    if (!running) return
+    this.worker.postMessage('stop')
+    await running.catch(() => {})
   }
 
   terminate() {

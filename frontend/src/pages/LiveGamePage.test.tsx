@@ -77,6 +77,8 @@ describe('LiveGamePage', () => {
     vi.mocked(liveApi.finish).mockResolvedValue(pendingGame({ id: 42 }))
     renderPage()
     expect(await screen.findByText(l.youRecord)).toBeInTheDocument()
+    // Fair play: the players never get the engine during their own game
+    expect(screen.queryByRole('switch', { name: l.analysisSwitch })).not.toBeInTheDocument()
 
     await typeMoves('e4 e5')
     await waitFor(() => expect(liveApi.saveMoves).toHaveBeenCalledWith(7, '1. e4 e5', 0))
@@ -106,7 +108,8 @@ describe('LiveGamePage', () => {
     vi.mocked(liveApi.get).mockResolvedValue(live({ canRecord: false, moves: '1. e4 c5' }))
     renderPage()
     expect(await screen.findByText(l.following)).toBeInTheDocument()
-    expect(screen.getByText('1. e4 c5')).toBeInTheDocument()
+    expect(screen.getByText(l.followingLive)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'c5' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /1–0/ })).not.toBeInTheDocument()
   })
 

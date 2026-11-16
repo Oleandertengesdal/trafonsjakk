@@ -106,6 +106,13 @@ function describe(chess: Chess) {
   return { fen: chess.fen(), toMove: chess.turn(), over }
 }
 
+/** The position after playing `sans` from `fen` (which must all be legal), like an entry of positions(). */
+export function playFrom(fen: string, sans: string[]): { fen: string; toMove: 'w' | 'b'; over: 'checkmate' | 'draw' | null } {
+  const chess = new Chess(fen)
+  for (const san of sans) chess.move(san)
+  return describe(chess)
+}
+
 /** The score of a finished position, without asking the engine. */
 export function terminalScore(p: { toMove: 'w' | 'b'; over: 'checkmate' | 'draw' | null }): Score | null {
   if (p.over === 'checkmate') return { mate: 0, by: p.toMove === 'w' ? 'b' : 'w' }
@@ -162,6 +169,20 @@ export function pvToSan(fen: string, pv: string[], max = 10): string[] {
     // An illegal move (a stale line for another position): keep what was legal
   }
   return out
+}
+
+/**
+ * Moves played after `afterPly` half-moves, numbered the usual way: "14... Nf6 15. Bg5 h6". `first` is the
+ * first move with its number, `rest` the others.
+ */
+export function numberedLine(sans: string[], afterPly: number): { first: string; rest: string } {
+  const parts = sans.map((san, i) => {
+    const ply = afterPly + i + 1
+    const n = Math.ceil(ply / 2)
+    if (ply % 2 === 1) return `${n}. ${san}`
+    return i === 0 ? `${n}... ${san}` : san
+  })
+  return { first: parts[0] ?? '', rest: parts.slice(1).join(' ') }
 }
 
 /** Reviews a game from evaluations of all its positions (`evals[i]` is the position after `i` moves). */

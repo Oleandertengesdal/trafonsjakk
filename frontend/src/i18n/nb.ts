@@ -793,15 +793,9 @@ export const nb: Dict = {
     following: 'Oppdateres av seg selv mens partiet pågår. Trykk på et trekk for å se stillingen etter det.',
     followingLive: 'Følger direkte',
     returnToLive: (behind: number) => (behind === 1 ? 'Tilbake til direkte (1 nytt trekk)' : `Tilbake til direkte (${behind} nye trekk)`),
-    analysisTitle: 'Analyse',
-    analysisSwitch: 'Stockfish',
     analysisIntro:
       'Slå på Stockfish for å se hvem som står best og de beste trekkene i stillingen på brettet, direkte mens partiet pågår. Den kjører på din egen enhet; motoren (7 MB) lastes ned første gang.',
     analysisFairPlay: 'Bare tilskuere ser dette. Spillerne får ikke analysen mens de spiller.',
-    analysisGameOver: 'Partiet er over i denne stillingen.',
-    thinking: 'Tenker …',
-    engineLines: 'Motorens beste trekk',
-    depth: (depth, max) => (depth >= max ? `Dybde ${depth}, ferdig` : `Dybde ${depth} av ${max}`),
     youRecord: 'Du fører dette partiet. Trekkene lagres med en gang du gjør dem.',
     saving: 'Lagrer …',
     saved: 'Lagret',
@@ -824,6 +818,22 @@ export const nb: Dict = {
     backToLive: 'Tilbake til direktepartier',
     awake: 'Skjermen holdes på mens denne siden er åpen.',
     cancel: 'Avbryt',
+  },
+
+  engine: {
+    title: 'Analyse',
+    switch: 'Stockfish',
+    thinking: 'Tenker …',
+    lines: 'Motorens beste trekk',
+    depth: (depth: number, max: number) => (depth >= max ? `Dybde ${depth}, ferdig` : `Dybde ${depth} av ${max}`),
+    gameOver: 'Partiet er over i denne stillingen.',
+    play: (move: string) => `Spill ${move} på brettet`,
+    viewerIntro:
+      'Slå på Stockfish for å se de beste trekkene i hver stilling i partiet, og prøv dine egne trekk på brettet: hva om du hadde spilt noe annet? Den kjører på din egen enhet; motoren (7 MB) lastes ned første gang.',
+    tryMoves: 'Dra en brikke for å prøve et annet trekk, eller trykk på en av motorens linjer for å spille den.',
+    variation: (from: string) => `Din egen variant, fra ${from}`,
+    variationStart: 'Din egen variant, fra utgangsstillingen',
+    backToGame: 'Tilbake til partiet',
   },
 
   tv: {

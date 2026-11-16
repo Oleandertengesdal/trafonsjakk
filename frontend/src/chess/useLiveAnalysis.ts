@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { EngineLine } from './analysis'
 import { Engine } from './engine'
 
@@ -71,4 +71,28 @@ export function useLiveAnalysis(fen: string | null, enabled: boolean): LiveAnaly
   if (failed) return { status: 'error' }
   if (!loaded) return { status: 'loading' }
   return result && result.fen === fen ? { status: 'thinking', depth: result.depth, lines: result.lines } : { status: 'thinking', depth: 0, lines: [] }
+}
+
+const SWITCH_KEY = 'tf-live-analysis'
+
+/** The Stockfish switch, remembered on this device (the same choice for live games and finished ones). */
+export function useEngineSwitch(): [boolean, () => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(SWITCH_KEY) === 'on'
+    } catch {
+      return false
+    }
+  })
+  const toggle = useCallback(() => {
+    setOn((was) => {
+      try {
+        localStorage.setItem(SWITCH_KEY, was ? 'off' : 'on')
+      } catch {
+        // Not remembered, that's all
+      }
+      return !was
+    })
+  }, [])
+  return [on, toggle]
 }

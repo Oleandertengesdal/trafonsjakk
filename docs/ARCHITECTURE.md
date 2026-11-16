@@ -501,6 +501,8 @@ Analysis is optional and only offered for games with recorded moves. Nothing run
 4. The viewer shows an evaluation bar, a graph of the game (tap to jump), the marks in the move list, a sentence per move ("5. Nxf7? Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine's next move as an arrow, and a table per player.
 5. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so reopening the game shows them at once. Nothing is sent to the server.
 
+Next to that whole-game review, the viewer has the same **live analysis** as a spectator of a live game (`useLiveAnalysis`, `EngineLines`): a Stockfish switch (remembered on the device, shared with live games) that searches the position on the board to depth 20 with the three best lines, updating as it deepens. With it on you can try your own moves, by dragging a piece, tapping a piece and then a square, or tapping one of the engine's lines. A move that is the game's own next move just steps forward; anything else starts *your own line* branching off the game, which the engine follows. "Previous move" takes back your last move, and *Back to the game* (or stepping through the game) leaves the line. While Stockfish is on, its live evaluation drives the bar and the arrow; with it off, the whole-game review does.
+
 The CSP allows this with `script-src 'self' 'wasm-unsafe-eval'` and `worker-src 'self'`; JavaScript `eval` stays forbidden.
 
 ### 4.4b Installable app (PWA)

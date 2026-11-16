@@ -85,21 +85,21 @@ describe('watching a live game', () => {
     expect(screen.getByText(l.analysisFairPlay)).toBeInTheDocument()
     expect(Engine.load).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('switch', { name: l.analysisSwitch }))
-    const lines = await screen.findByRole('list', { name: l.engineLines })
+    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
+    const lines = await screen.findByRole('list', { name: en.engine.lines })
     expect(within(lines).getAllByRole('listitem')).toHaveLength(2)
     expect(within(lines).getByText('2. Nf3')).toBeInTheDocument()
     expect(within(lines).getByText('Nc6 3. Bb5')).toBeInTheDocument()
     expect(within(lines).getByText('+0.3')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: en.analysis.evalBar('+0.3') })).toBeInTheDocument()
-    expect(screen.getByText(l.depth(16, 20))).toBeInTheDocument()
+    expect(screen.getByText(en.engine.depth(16, 20))).toBeInTheDocument()
 
     // Stepping back analyses that position instead
     await userEvent.click(within(screen.getByRole('list', { name: en.moves.list })).getByRole('button', { name: 'e4' }))
     await waitFor(() => expect(engine.analyse).toHaveBeenLastCalledWith(expect.stringContaining(' b KQkq'), expect.any(Function)))
 
     // Switching off stops the engine, and the choice is remembered
-    await userEvent.click(screen.getByRole('switch', { name: l.analysisSwitch }))
+    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
     expect(engine.terminate).toHaveBeenCalled()
     expect(localStorage.getItem('tf-live-analysis')).toBe('off')
   })
@@ -107,7 +107,7 @@ describe('watching a live game', () => {
   it('says so when the engine can’t run here', async () => {
     vi.mocked(Engine.load).mockRejectedValue(new Error('no wasm'))
     setup('1. d4')
-    await userEvent.click(screen.getByRole('switch', { name: l.analysisSwitch }))
+    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
     expect(await screen.findByText(en.analysis.failed)).toBeInTheDocument()
   })
 })

@@ -2,13 +2,29 @@
 // numbers about the game. Loaded lazily (chess.js and the board), like the move recorder.
 import { useMemo, useRef, useState, useEffect, type KeyboardEvent } from 'react'
 import { Chessboard } from 'react-chessboard'
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Cpu, FlipVertical2 } from 'lucide-react'
-import { glyph, reviewGame, scoreText, uciToSan, winPercent, type GameReview, type Judgement, type PositionEval } from '../../chess/analysis'
+import { Chess, type Square } from 'chess.js'
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, CornerUpLeft, Cpu, FlipVertical2 } from 'lucide-react'
+import {
+  glyph,
+  numberedLine,
+  playFrom,
+  positions,
+  reviewGame,
+  scoreText,
+  terminalScore,
+  uciToSan,
+  winPercent,
+  type GameReview,
+  type Judgement,
+  type PositionEval,
+} from '../../chess/analysis'
 import { moveSquares, moveStats, parseMoves, positionAfter } from '../../chess/moves'
 import { useAnalysis, type AnalysisState } from '../../chess/useAnalysis'
+import { useEngineSwitch, useLiveAnalysis } from '../../chess/useLiveAnalysis'
 import { useI18n } from '../../i18n/I18nProvider'
 import { cn } from '../../lib/cn'
 import { Button } from '../ui/Button'
+import { EngineLines, EngineSwitch } from './EngineLines'
 import { EvalBar, EvalGraph } from './EvalGraph'
 
 export interface GameViewerProps {
@@ -44,7 +60,59 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
   const evals = analysis.state.status === 'done' ? analysis.state.evals : null
   const review = useMemo(() => (evals && parsed.ok ? reviewGame(sans, evals) : null), [evals, sans, parsed.ok])
 
-  const go = (p: number) => setPly(Math.max(0, Math.min(sans.length, p)))
+  // Live Stockfish on the position on the board, and your own moves to try ("what if…?"): a line of
+  // moves that branches off the game after `from` moves. Stepping through the game leaves it.
+  const [engineOn, toggleEngine] = useEngineSwitch()
+  const [line, setLine] = useState<{ from: number; moves: { san: string; from: string; to: string }[] } | null>(null)
+  const gamePositions = useMemo(() => (parsed.ok ? positions(sans) : []), [parsed.ok, sans])
+  const shown = useMemo(
+    () => (line ? playFrom(gamePositions[line.from].fen, line.moves.map((m) => m.san)) : gamePositions[ply]),
+    [line, gamePositions, ply],
+  )
+  const shownFinal = shown ? terminalScore(shown) : null
+  const shownPly = line ? line.from + line.moves.length : ply
+  const live = useLiveAnalysis(shown && !shownFinal ? shown.fen : null, engineOn && parsed.ok)
+
+  // Tap a piece, then where it goes (for phones; dragging works too)
+  const [selected, setSelected] = useState<string | null>(null)
+
+  const go = (p: number) => {
+    setSelected(null)
+    setLine(null)
+    setPly(Math.max(0, Math.min(sans.length, p)))
+  }
+
+  /** A move made on the board: the game's own next move steps forward; anything else starts or extends your line. */
+  function tryMove(from: string, to: string, promotion = 'q'): boolean {
+    if (!shown) return false
+    let move
+    try {
+      move = new Chess(shown.fen).move({ from, to, promotion })
+    } catch {
+      return false
+    }
+    setSelected(null)
+    if (!line && sans[ply] === move.san) {
+      setPly(ply + 1)
+      return true
+    }
+    const played = { san: move.san, from: move.from, to: move.to }
+    setLine((l) => ({ from: l?.from ?? ply, moves: [...(l?.moves ?? []), played] }))
+    return true
+  }
+
+  function onSquareClick(square: string) {
+    if (!engineOn || !shown) return
+    if (selected && selected !== square && tryMove(selected, square)) return
+    const piece = new Chess(shown.fen).get(square as Square)
+    setSelected(piece && piece.color === shown.toMove && square !== selected ? square : null)
+  }
+
+  /** One move back in your own line; past its first move you're back in the game. */
+  function back() {
+    setSelected(null)
+    setLine((l) => (l && l.moves.length > 1 ? { ...l, moves: l.moves.slice(0, -1) } : null))
+  }
 
   // Keep the current move visible in the list
   useEffect(() => {
@@ -58,6 +126,12 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
   }, [ply])
 
   function onKeyDown(e: KeyboardEvent) {
+    if (line && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+      e.preventDefault()
+      back()
+      return
+    }
+    if (line && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) return
     const next = { ArrowLeft: ply - 1, ArrowRight: ply + 1, Home: 0, End: sans.length, ArrowUp: ply - 1, ArrowDown: ply + 1 }[e.key]
     if (next !== undefined) {
       e.preventDefault()
@@ -65,7 +139,7 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
     }
   }
 
-  const last = ply > 0 ? squares[ply - 1] : null
+  const last = line ? line.moves[line.moves.length - 1] : ply > 0 ? squares[ply - 1] : null
   const highlight = { backgroundColor: 'rgb(226 177 74 / 0.5)' }
   const rows: { n: number; white: number; black: number | null }[] = []
   for (let i = 1; i <= sans.length; i += 2) rows.push({ n: (i + 1) / 2, white: i, black: i + 1 <= sans.length ? i + 1 : null })
@@ -103,8 +177,13 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
   if (stats.white.promotions + stats.black.promotions > 0) statRows.push([v.promotions, stats.white.promotions, stats.black.promotions])
 
   const whiteAtBottom = (orientation === 'white') !== flipped
-  const here = evals?.[ply]
-  const bestHere = here?.best ?? null
+  const lineMoves = line ? numberedLine(line.moves.map((m) => m.san), line.from) : null
+  const lineText = lineMoves ? `${lineMoves.first} ${lineMoves.rest}`.trim() : ''
+  const here = line ? undefined : evals?.[ply]
+  const liveTop = live.status === 'thinking' ? live.lines[0] : undefined
+  // With Stockfish on, the live engine has the say (it looks deeper); otherwise the whole-game review
+  const barScore = engineOn ? (shownFinal ?? liveTop?.score ?? null) : (here?.score ?? null)
+  const bestHere = engineOn ? (liveTop?.pv[0] ?? null) : (here?.best ?? null)
   const arrows = bestHere ? [{ startSquare: bestHere.slice(0, 2), endSquare: bestHere.slice(2, 4), color: 'rgb(43 106 75 / 0.85)' }] : []
 
   return (
@@ -117,26 +196,28 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
     >
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
-          {here && (
-            <EvalBar
-              white={winPercent(here.score)}
-              whiteAtBottom={whiteAtBottom}
-              label={t.analysis.evalBar(scoreText(here.score, f.decimal1))}
-            />
+          {barScore && (
+            <EvalBar white={winPercent(barScore)} whiteAtBottom={whiteAtBottom} label={t.analysis.evalBar(scoreText(barScore, f.decimal1))} />
           )}
         <div className="min-w-0 flex-1 overflow-hidden rounded-control border border-line">
           <Chessboard
             options={{
               id: 'game-viewer',
-              position: positionAfter(sans, ply),
+              position: shown?.fen ?? positionAfter(sans, ply),
               boardOrientation: whiteAtBottom ? 'white' : 'black',
-              allowDragging: false,
+              // With the engine on you can try your own moves
+              allowDragging: engineOn,
+              onPieceDrop: ({ sourceSquare, targetSquare }) => (targetSquare ? tryMove(sourceSquare, targetSquare) : false),
+              onSquareClick: ({ square }) => onSquareClick(square),
               allowDrawingArrows: false,
               arrows,
               animationDurationInMs: 150,
               lightSquareStyle: { backgroundColor: '#f3e6d0' },
               darkSquareStyle: { backgroundColor: '#b86a58' },
-              squareStyles: last ? { [last.from]: highlight, [last.to]: highlight } : {},
+              squareStyles: {
+                ...(last ? { [last.from]: highlight, [last.to]: highlight } : {}),
+                ...(selected ? { [selected]: { boxShadow: 'inset 0 0 0 3px rgb(31 41 51 / 0.55)' } } : {}),
+              },
             }}
           />
         </div>
@@ -146,10 +227,10 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
             <Button variant="secondary" size="sm" aria-label={v.start} title={v.start} disabled={ply === 0} onClick={() => go(0)}>
               <ChevronFirst aria-hidden className="size-4.5" />
             </Button>
-            <Button variant="secondary" size="sm" aria-label={v.prev} title={v.prev} disabled={ply === 0} onClick={() => go(ply - 1)}>
+            <Button variant="secondary" size="sm" aria-label={v.prev} title={v.prev} disabled={!line && ply === 0} onClick={() => (line ? back() : go(ply - 1))}>
               <ChevronLeft aria-hidden className="size-4.5" />
             </Button>
-            <Button variant="secondary" size="sm" aria-label={v.next} title={v.next} disabled={ply === sans.length} onClick={() => go(ply + 1)}>
+            <Button variant="secondary" size="sm" aria-label={v.next} title={v.next} disabled={!!line || ply === sans.length} onClick={() => go(ply + 1)}>
               <ChevronRight aria-hidden className="size-4.5" />
             </Button>
             <Button variant="secondary" size="sm" aria-label={v.end} title={v.end} disabled={ply === sans.length} onClick={() => go(sans.length)}>
@@ -172,14 +253,43 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        <div>
-          <p data-testid="viewer-status" className="font-medium" aria-live="polite">
-            {ply === 0 ? v.startPosition : v.afterMove(label(sans, ply))}
-            {review && ply > 0 && review.moves[ply - 1].judgement && glyph[review.moves[ply - 1].judgement!]}
-          </p>
-          {review && evals && <MoveComment review={review} evals={evals} sans={sans} ply={ply} />}
-          <p className="hidden text-[0.8125rem] text-faint sm:block">{v.keyboard}</p>
-        </div>
+        {line ? (
+          <div data-testid="viewer-line" aria-live="polite">
+            <p className="font-medium">{line.from === 0 ? t.engine.variationStart : t.engine.variation(label(sans, line.from))}</p>
+            <p className="mt-1 font-mono text-sm">
+              {lineText}
+            </p>
+            <Button variant="secondary" size="sm" className="mt-2" onClick={() => go(line.from)}>
+              <CornerUpLeft aria-hidden className="size-4" />
+              {t.engine.backToGame}
+            </Button>
+          </div>
+        ) : (
+          <div>
+            <p data-testid="viewer-status" className="font-medium" aria-live="polite">
+              {ply === 0 ? v.startPosition : v.afterMove(label(sans, ply))}
+              {review && ply > 0 && review.moves[ply - 1].judgement && glyph[review.moves[ply - 1].judgement!]}
+            </p>
+            {review && evals && <MoveComment review={review} evals={evals} sans={sans} ply={ply} />}
+            <p className="hidden text-[0.8125rem] text-faint sm:block">{v.keyboard}</p>
+          </div>
+        )}
+
+        <section aria-label={t.engine.title} className="rounded-control border border-line px-4 py-3.5">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="font-display text-[0.9375rem] font-semibold">{t.engine.title}</h3>
+            <EngineSwitch checked={engineOn} onChange={toggleEngine} />
+          </div>
+          <EngineLines
+            analysis={live}
+            finished={shownFinal !== null}
+            ply={shownPly}
+            fen={shown?.fen ?? ''}
+            intro={<p className="text-[0.9375rem] text-muted">{t.engine.viewerIntro}</p>}
+            onPlay={(uci) => tryMove(uci.slice(0, 2), uci.slice(2, 4), uci[4] ?? 'q')}
+          />
+          {engineOn && live.status === 'thinking' && <p className="mt-2 text-[0.8125rem] text-faint">{t.engine.tryMoves}</p>}
+        </section>
 
         <ol
           ref={listRef}

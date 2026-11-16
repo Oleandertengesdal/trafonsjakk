@@ -798,15 +798,9 @@ export const en = {
     following: 'Updates by itself while the game is on. Tap a move to see the position after it.',
     followingLive: 'Following live',
     returnToLive: (behind: number) => (behind === 1 ? 'Back to live (1 new move)' : `Back to live (${behind} new moves)`),
-    analysisTitle: 'Analysis',
-    analysisSwitch: 'Stockfish',
     analysisIntro:
       'Turn on Stockfish to see who’s better and the best moves in the position on the board, live as the game goes on. It runs on your own device; the engine (7 MB) downloads the first time.',
     analysisFairPlay: 'Only spectators see this. The players don’t get the analysis while they play.',
-    analysisGameOver: 'The game is over in this position.',
-    thinking: 'Thinking…',
-    engineLines: 'The engine’s best moves',
-    depth: (depth: number, max: number) => (depth >= max ? `Depth ${depth}, done` : `Depth ${depth} of ${max}`),
     youRecord: 'You’re recording this game. Moves are saved as you make them.',
     saving: 'Saving…',
     saved: 'Saved',
@@ -829,6 +823,22 @@ export const en = {
     backToLive: 'Back to live games',
     awake: 'The screen stays on while this page is open.',
     cancel: 'Cancel',
+  },
+
+  engine: {
+    title: 'Analysis',
+    switch: 'Stockfish',
+    thinking: 'Thinking…',
+    lines: 'The engine’s best moves',
+    depth: (depth: number, max: number) => (depth >= max ? `Depth ${depth}, done` : `Depth ${depth} of ${max}`),
+    gameOver: 'The game is over in this position.',
+    play: (move: string) => `Play ${move} on the board`,
+    viewerIntro:
+      'Turn on Stockfish to see the best moves in each position of the game, and try your own moves on the board: what if you had played something else? It runs on your own device; the engine (7 MB) downloads the first time.',
+    tryMoves: 'Drag a piece to try another move, or tap one of the engine’s lines to play it.',
+    variation: (from: string) => `Your own line, from ${from}`,
+    variationStart: 'Your own line, from the starting position',
+    backToGame: 'Back to the game',
   },
 
   tv: {

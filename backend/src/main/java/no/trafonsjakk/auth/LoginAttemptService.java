@@ -72,6 +72,15 @@ public class LoginAttemptService {
         failures.invalidate(userKey(username));
     }
 
+    /**
+     * Forgets every counter. Only the tests use this: they empty the database before each test, so user
+     * ids start again from 1, and a counter keyed by id must not carry over to a different person.
+     */
+    public void forgetAll() {
+        failures.invalidateAll();
+        registrations.invalidateAll();
+    }
+
     public void assertRegistrationAllowed(ClientAddress from) {
         boolean overClient = increment(registrations, ipKey(from.client())) > cfg.maxRegistrationsPerIpPerHour();
         boolean overEdge = increment(registrations, edgeKey(from.edge())) > cfg.maxRegistrationsPerEdgePerHour();

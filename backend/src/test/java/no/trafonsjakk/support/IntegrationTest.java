@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import no.trafonsjakk.auth.LoginAttemptService;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,8 +35,13 @@ public abstract class IntegrationTest {
     @Autowired
     protected JdbcTemplate jdbc;
 
+    @Autowired
+    private LoginAttemptService attempts;
+
     @BeforeEach
     void cleanDatabase() {
+        // Ids restart below, so in-memory counters keyed by user id would otherwise land on someone else
+        attempts.forgetAll();
         jdbc.execute("TRUNCATE live_games, rating_history, games, tournament_matches, tournament_participants, tournaments, "
                 + "monthly_awards, comment_likes, game_comments, game_kudos, password_reset_tokens, invite_redemptions, "
                 + "refresh_tokens, invite_codes, users RESTART IDENTITY CASCADE");

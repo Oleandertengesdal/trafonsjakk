@@ -9,7 +9,7 @@ import { I18nProvider } from '../../i18n/I18nProvider'
 import { kari, ola } from '../../test/fixtures'
 import LiveSpectator from './LiveSpectator'
 
-vi.mock('../../chess/engine', () => ({ Engine: { load: vi.fn() }, ENGINE_NAME: 'Stockfish 18', LIVE_DEPTH: 20 }))
+vi.mock('../../chess/engine', () => ({ Engine: { load: vi.fn() }, ENGINE_NAME: 'Stockfish 18', LIVE_DEPTH: 18 }))
 
 const l = en.live
 const v = en.viewer
@@ -31,6 +31,7 @@ const game = (moves: string | null): LiveGame => ({
 function fakeEngine(lines: EngineLine[]) {
   return {
     analyse: vi.fn(async (_fen: string, onLine: (line: EngineLine) => void) => lines.forEach(onLine)),
+    halt: vi.fn(async () => {}),
     terminate: vi.fn(),
   }
 }
@@ -85,29 +86,30 @@ describe('watching a live game', () => {
     expect(screen.getByText(l.analysisFairPlay)).toBeInTheDocument()
     expect(Engine.load).not.toHaveBeenCalled()
 
-    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
+    await userEvent.click(screen.getByRole('button', { name: en.engine.toggle }))
     const lines = await screen.findByRole('list', { name: en.engine.lines })
+    expect(await within(lines).findByText('2. Nf3')).toBeInTheDocument()
+    // Two lines; the third place waits for a third line
     expect(within(lines).getAllByRole('listitem')).toHaveLength(2)
-    expect(within(lines).getByText('2. Nf3')).toBeInTheDocument()
-    expect(within(lines).getByText('Nc6 3. Bb5')).toBeInTheDocument()
+    expect(within(lines).getByText(/Nc6 3\. Bb5/)).toBeInTheDocument()
     expect(within(lines).getByText('+0.3')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: en.analysis.evalBar('+0.3') })).toBeInTheDocument()
-    expect(screen.getByText(en.engine.depth(16, 20))).toBeInTheDocument()
+    expect(screen.getByText(en.engine.depth(16, 18))).toBeInTheDocument()
 
     // Stepping back analyses that position instead
     await userEvent.click(within(screen.getByRole('list', { name: en.moves.list })).getByRole('button', { name: 'e4' }))
     await waitFor(() => expect(engine.analyse).toHaveBeenLastCalledWith(expect.stringContaining(' b KQkq'), expect.any(Function)))
 
     // Switching off stops the engine, and the choice is remembered
-    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
+    await userEvent.click(screen.getByRole('button', { name: en.engine.toggle }))
     expect(engine.terminate).toHaveBeenCalled()
-    expect(localStorage.getItem('tf-live-analysis')).toBe('off')
+    expect(localStorage.getItem('tf-analysis-mode')).toBe('off')
   })
 
   it('says so when the engine can’t run here', async () => {
     vi.mocked(Engine.load).mockRejectedValue(new Error('no wasm'))
     setup('1. d4')
-    await userEvent.click(screen.getByRole('switch', { name: en.engine.switch }))
+    await userEvent.click(screen.getByRole('button', { name: en.engine.toggle }))
     expect(await screen.findByText(en.analysis.failed)).toBeInTheDocument()
   })
 })

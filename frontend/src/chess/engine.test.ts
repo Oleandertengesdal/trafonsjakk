@@ -93,4 +93,28 @@ describe('Engine', () => {
     // MultiPV is only set when it changes
     expect(sent.filter((m) => m.startsWith('setoption')).length).toBe(1)
   })
+
+  it('reviews with the same engine: a review position stops the live search and goes back to one line', async () => {
+    const sent: string[] = []
+    const w: EngineWorker = {
+      onmessage: null,
+      onerror: null,
+      terminate() {},
+      postMessage(message: string) {
+        sent.push(message)
+        const say = (...lines: string[]) => queueMicrotask(() => lines.forEach((l) => w.onmessage?.({ data: l } as MessageEvent)))
+        if (message === 'uci') say('uciok')
+        else if (message === 'isready') say('readyok')
+        else if (message.startsWith('go depth 18')) say('info depth 8 multipv 1 score cp 25 pv e7e5')
+        else if (message.startsWith('go depth')) say('info depth 14 score cp 12 pv e7e5', 'bestmove e7e5')
+        else if (message === 'stop') say('bestmove e7e5')
+      },
+    }
+    const engine = await Engine.load(() => w)
+    await engine.analyse(BLACK_TO_MOVE, () => {}, { lines: 3, depth: 18 })
+    const result = await engine.evaluate(BLACK_TO_MOVE)
+    expect(result).toEqual({ score: { cp: -12 }, best: 'e7e5' })
+    const after = sent.slice(sent.indexOf('go depth 18'))
+    expect(after.slice(1, 3)).toEqual(['stop', 'setoption name MultiPV value 1'])
+  })
 })

@@ -734,30 +734,21 @@ export const en = {
 
   analysis: {
     title: 'Engine analysis',
-    run: 'Analyse with Stockfish',
-    intro: 'Runs on your own device; nothing is sent anywhere. The engine (7 MB) downloads the first time.',
-    loading: 'Starting the engine',
-    progress: (done: number, total: number) => `Analysing position ${done} of ${total}`,
-    cancel: 'Stop',
     failed: "The analysis didn't work in this browser.",
-    retry: 'Try again',
     accuracy: 'Accuracy',
-    blunders: 'Blunders (??)',
-    mistakes: 'Mistakes (?)',
-    inaccuracies: 'Inaccuracies (?!)',
+    player: 'Player',
+    marks: 'Blunders, mistakes and inaccuracies',
+    clean: 'No mistakes',
     judgement: { blunder: 'Blunder', mistake: 'Mistake', inaccuracy: 'Inaccuracy' },
     cost: (pawns: string, one: boolean) => `cost ${pawns} ${one ? 'pawn' : 'pawns'}`,
     allowedMate: (n: number) => `allowed mate in ${n}`,
     missedMate: (n: number) => `missed mate in ${n}`,
     better: (move: string) => `Better was ${move}.`,
     best: "The engine's first choice.",
-    evaluation: (score: string) => `Evaluation: ${score}`,
-    bestHere: (move: string) => `Engine's move here: ${move}`,
     evalBar: (score: string) => `Evaluation ${score}, from White's side`,
     graph: 'Evaluation through the game. White is ahead above the middle line.',
     credit: 'Stockfish 18, free software (GPLv3)',
     source: 'source code',
-    analysed: 'Analysed on this device',
   },
 
   context: {
@@ -798,8 +789,6 @@ export const en = {
     following: 'Updates by itself while the game is on. Tap a move to see the position after it.',
     followingLive: 'Following live',
     returnToLive: (behind: number) => (behind === 1 ? 'Back to live (1 new move)' : `Back to live (${behind} new moves)`),
-    analysisIntro:
-      'Turn on Stockfish to see who’s better and the best moves in the position on the board, live as the game goes on. It runs on your own device; the engine (7 MB) downloads the first time.',
     analysisFairPlay: 'Only spectators see this. The players don’t get the analysis while they play.',
     youRecord: 'You’re recording this game. Moves are saved as you make them.',
     saving: 'Saving…',
@@ -827,19 +816,21 @@ export const en = {
 
   engine: {
     title: 'Analysis',
-    switch: 'Stockfish',
+    toggle: 'Analyse',
+    toggleHint: 'Stockfish in your browser: reviews the game, shows the best moves and lets you try your own',
+    starting: 'Starting Stockfish…',
+    reviewing: (done: number, total: number) => `Going through the game: position ${done} of ${total}`,
     thinking: 'Thinking…',
     lines: 'The engine’s best moves',
-    depth: (depth: number, max: number) => (depth >= max ? `Depth ${depth}, done` : `Depth ${depth} of ${max}`),
+    depth: (depth: number, max: number) => (depth >= max ? `depth ${depth}` : `depth ${depth}/${max}`),
     gameOver: 'The game is over in this position.',
     play: (move: string) => `Play ${move} on the board`,
-    viewerIntro:
-      'Turn on Stockfish to see the best moves in each position of the game, and try your own moves on the board: what if you had played something else? It runs on your own device; the engine (7 MB) downloads the first time.',
-    tryMoves: 'Drag a piece to try another move, or tap one of the engine’s lines to play it.',
+    tryMoves: 'Drag a piece, or tap one and then a square, to try your own move. Tap a line to play it.',
     variation: (from: string) => `Your own line, from ${from}`,
     variationStart: 'Your own line, from the starting position',
     backToGame: 'Back to the game',
   },
+
 
   tv: {
     liveNow: 'Playing now',

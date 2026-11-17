@@ -78,7 +78,7 @@ describe('LiveGamePage', () => {
     renderPage()
     expect(await screen.findByText(l.youRecord)).toBeInTheDocument()
     // Fair play: the players never get the engine during their own game
-    expect(screen.queryByRole('switch', { name: en.engine.switch })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: en.engine.toggle })).not.toBeInTheDocument()
 
     await typeMoves('e4 e5')
     await waitFor(() => expect(liveApi.saveMoves).toHaveBeenCalledWith(7, '1. e4 e5', 0))

@@ -392,7 +392,7 @@ Two awards per calendar month (Norwegian time), from confirmed games only:
 
 `live_games` holds games being played right now (V5). The design is deliberately simple because the free API sleeps and has one instance: no WebSockets, just polling. The recorder saves the whole move text after every move with the version it last saw; the row is locked while saving (`findByIdForUpdate`) and an older version is refused with `live.out_of_date`, after which the phone takes the newer moves. Followers poll every 3 seconds, the TV every 4. Finishing goes through `GameService.create`, so the normal confirmation, rating and tournament rules apply unchanged. Idle games (6 hours without a save) are marked abandoned whenever live games are read.
 
-Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board follows the game, they can step back through the moves (and jump back to the live position, with a count of the moves they missed), and they can switch on Stockfish. The engine (the same in-browser Stockfish as the game analysis, `Engine.analyse`) searches whatever position is on the board to depth 20 with three lines (MultiPV), reporting as it deepens; a new move or stepping back stops the old search and starts a new one. The page shows an evaluation bar, an arrow for the best move and the three best continuations. **Fair play:** the players (and anyone recording the game) never get this view during the game, and the TV shows no evaluation, since players can see it. This is a guard in the interface, not a lock: a player could still open the page logged in as someone else.
+Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board follows the game, they can step back through the moves (and jump back to the live position, with a count of the moves they missed), and they can switch on **Analyse**. The engine (the same in-browser Stockfish and the same parts as the game analysis: `useStockfish`, `AnalysisBoard`, `EnginePanel`) searches whatever position is on the board to depth 18 with three lines (MultiPV), reporting as it deepens; a new move or stepping back stops the old search and starts a new one. The page shows an evaluation bar, an arrow for the best move and the three best continuations. **Fair play:** the players (and anyone recording the game) never get this view during the game, and the TV shows no evaluation, since players can see it. This is a guard in the interface, not a lock: a player could still open the page logged in as someone else.
 
 ### 3.10 Your data and deleting an account
 
@@ -477,14 +477,16 @@ src/
 │   │                            GameActions, AdminResolveControls, RatingChart, ActivityBars,
 │   │                            Crosstable, Bracket, PlayerSelect, MoveRecorder, GameMoves,
 │   │                            GameViewer (replay + move statistics), GameContextPanel,
-│   │                            GameComments, KudosButton, EvalGraph/EvalBar (engine analysis)
+│   │                            GameComments, KudosButton, EvalGraph/EvalBar, AnalysisBoard, EnginePanel,
+│   │                            MoveList (engine analysis, shared by the game page and live games)
 │   ├── awards/                  MonthlyAwardCard (home), AwardsPanel (ratings page), AwardBadges (profile)
 │   ├── year/                    StoryViewer, StoryCard, player and group slides, shareCard (card → PNG),
 │   │                            YearBanner (home, December–January)
 │   └── admin/                   ResetLinkButton
 ├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts,
 │                                engine.ts (Stockfish over UCI in a Web Worker), analysis.ts (scores, judgements,
-│                                accuracy), useAnalysis.ts (runs it, caches results in this browser)
+│                                accuracy), useStockfish.ts (one engine per board: review, cached in this
+│                                browser, then live lines)
 ├── pages/                       one file per route
 ├── i18n/                        en.ts, nb.ts (dictionaries), I18nProvider, format.ts (locale-aware
 │                                dates/numbers), rounds.ts, useErrorText.ts (server error codes → text)
@@ -493,15 +495,16 @@ src/
 
 ### 4.4 Engine analysis (Stockfish in the browser)
 
-Analysis is optional and only offered for games with recorded moves. Nothing runs until someone presses *Analyser med Stockfish*:
+Analysis is optional and only offered for games with recorded moves. Nothing runs until someone presses **Analyse** under the board; the choice is remembered on the device (and shared with live games). Everything Stockfish does for one board goes through **one engine** (`useStockfish`), so a phone never runs two at once:
 
-1. `Engine.load()` starts Stockfish 18 (the 7 MB "lite, single-threaded" WebAssembly build in `public/engine`, GPLv3, served unmodified from our own origin) in a **Web Worker** and does the UCI handshake. Single-threaded means no cross-origin-isolation headers are needed.
-2. Every position of the game is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. The user can stop it at any time, and the worker is terminated when they leave the page.
+1. `Engine.load()` starts Stockfish 18 (the 7 MB "lite, single-threaded" WebAssembly build in `public/engine`, GPLv3, served unmodified from our own origin) in a **Web Worker** and does the UCI handshake. Single-threaded means no cross-origin-isolation headers are needed. The worker is terminated when analysis is switched off or the page closes.
+2. **Review**, once per game: every position is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so the next time it's instant. Nothing is sent to the server.
 3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, averaged per player.
-4. The viewer shows an evaluation bar, a graph of the game (tap to jump), the marks in the move list, a sentence per move ("5. Nxf7? Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine's next move as an arrow, and a table per player.
-5. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so reopening the game shows them at once. Nothing is sent to the server.
+4. **Live lines**, after the review: the same engine thinks about the position on the board to depth 18 with its three best lines (MultiPV), reporting as it looks deeper. `Engine` runs one job at a time (`enqueue`): a new position stops the old search first, and a review position goes back to one line.
+5. With analysis on, the viewer shows the evaluation bar, a graph of the game (tap to jump), the marks in the move list, one sentence about the move just played ("Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine panel with its three lines and the depth, and accuracy per player. With it off, the page is just the board, the moves and a few numbers about the game.
+6. **Your own moves:** with analysis on you can drag a piece, tap a piece and then a square, or tap one of the engine's lines. The game's own next move just steps forward; anything else starts *your own line* branching off the game, which the engine follows. "Previous move" takes back your last move; the ✕ (or stepping through the game) goes back to the game.
 
-Next to that whole-game review, the viewer has the same **live analysis** as a spectator of a live game (`useLiveAnalysis`, `EngineLines`): a Stockfish switch (remembered on the device, shared with live games) that searches the position on the board to depth 20 with the three best lines, updating as it deepens. With it on you can try your own moves, by dragging a piece, tapping a piece and then a square, or tapping one of the engine's lines. A move that is the game's own next move just steps forward; anything else starts *your own line* branching off the game, which the engine follows. "Previous move" takes back your last move, and *Back to the game* (or stepping through the game) leaves the line. While Stockfish is on, its live evaluation drives the bar and the arrow; with it off, the whole-game review does.
+Keeping it smooth: the board is a memoized component that only redraws when the position, the last move, the arrow or the selection changes, not on every engine update; the engine panel updates at most every 300 ms and only when the lines actually changed; a search starts 250 ms after the position settles (so stepping quickly through moves doesn't start one per move); the arrow appears from depth 8, when the engine's first choice has stopped jumping around; and the engine rests while the page is hidden. Placeholders keep the panel's height while the engine starts. Measured on a throttled phone profile (6× slower CPU) while stepping through 20 moves: one worker instead of two, and less than half the main-thread blocking of the previous version.
 
 The CSP allows this with `script-src 'self' 'wasm-unsafe-eval'` and `worker-src 'self'`; JavaScript `eval` stays forbidden.
 

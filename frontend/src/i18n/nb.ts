@@ -729,30 +729,21 @@ export const nb: Dict = {
 
   analysis: {
     title: 'Analyse med motor',
-    run: 'Analyser med Stockfish',
-    intro: 'Kjører på din egen enhet, ingenting sendes noe sted. Motoren (7 MB) lastes ned første gang.',
-    loading: 'Starter motoren',
-    progress: (done, total) => `Analyserer stilling ${done} av ${total}`,
-    cancel: 'Stopp',
     failed: 'Analysen fungerte ikke i denne nettleseren.',
-    retry: 'Prøv igjen',
     accuracy: 'Nøyaktighet',
-    blunders: 'Tabber (??)',
-    mistakes: 'Feil (?)',
-    inaccuracies: 'Unøyaktigheter (?!)',
+    player: 'Spiller',
+    marks: 'Tabber, feil og unøyaktigheter',
+    clean: 'Ingen feil',
     judgement: { blunder: 'Tabbe', mistake: 'Feil', inaccuracy: 'Unøyaktighet' },
     cost: (pawns, one) => `kostet ${pawns} ${one ? 'bonde' : 'bønder'}`,
     allowedMate: (n) => `ga motstanderen matt i ${n}`,
     missedMate: (n) => `gikk glipp av matt i ${n}`,
     better: (move) => `Bedre var ${move}.`,
     best: 'Motorens førstevalg.',
-    evaluation: (score) => `Stillingen: ${score}`,
-    bestHere: (move) => `Motoren vil spille ${move} her`,
     evalBar: (score) => `Stillingen ${score}, sett fra hvit`,
     graph: 'Stillingen gjennom partiet. Hvit leder over midtlinjen.',
     credit: 'Stockfish 18, fri programvare (GPLv3)',
     source: 'kildekode',
-    analysed: 'Analysert på denne enheten',
   },
 
   context: {
@@ -793,8 +784,6 @@ export const nb: Dict = {
     following: 'Oppdateres av seg selv mens partiet pågår. Trykk på et trekk for å se stillingen etter det.',
     followingLive: 'Følger direkte',
     returnToLive: (behind: number) => (behind === 1 ? 'Tilbake til direkte (1 nytt trekk)' : `Tilbake til direkte (${behind} nye trekk)`),
-    analysisIntro:
-      'Slå på Stockfish for å se hvem som står best og de beste trekkene i stillingen på brettet, direkte mens partiet pågår. Den kjører på din egen enhet; motoren (7 MB) lastes ned første gang.',
     analysisFairPlay: 'Bare tilskuere ser dette. Spillerne får ikke analysen mens de spiller.',
     youRecord: 'Du fører dette partiet. Trekkene lagres med en gang du gjør dem.',
     saving: 'Lagrer …',
@@ -822,19 +811,21 @@ export const nb: Dict = {
 
   engine: {
     title: 'Analyse',
-    switch: 'Stockfish',
+    toggle: 'Analyse',
+    toggleHint: 'Stockfish i nettleseren: går gjennom partiet, viser de beste trekkene og lar deg prøve egne',
+    starting: 'Starter Stockfish …',
+    reviewing: (done: number, total: number) => `Går gjennom partiet: stilling ${done} av ${total}`,
     thinking: 'Tenker …',
     lines: 'Motorens beste trekk',
-    depth: (depth: number, max: number) => (depth >= max ? `Dybde ${depth}, ferdig` : `Dybde ${depth} av ${max}`),
+    depth: (depth: number, max: number) => (depth >= max ? `dybde ${depth}` : `dybde ${depth}/${max}`),
     gameOver: 'Partiet er over i denne stillingen.',
     play: (move: string) => `Spill ${move} på brettet`,
-    viewerIntro:
-      'Slå på Stockfish for å se de beste trekkene i hver stilling i partiet, og prøv dine egne trekk på brettet: hva om du hadde spilt noe annet? Den kjører på din egen enhet; motoren (7 MB) lastes ned første gang.',
-    tryMoves: 'Dra en brikke for å prøve et annet trekk, eller trykk på en av motorens linjer for å spille den.',
+    tryMoves: 'Dra en brikke, eller trykk på en og så et felt, for å prøve ditt eget trekk. Trykk på en linje for å spille den.',
     variation: (from: string) => `Din egen variant, fra ${from}`,
     variationStart: 'Din egen variant, fra utgangsstillingen',
     backToGame: 'Tilbake til partiet',
   },
+
 
   tv: {
     liveNow: 'Spilles nå',

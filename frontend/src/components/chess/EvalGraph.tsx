@@ -1,14 +1,15 @@
+import { memo } from 'react'
 import type { Judgement } from '../../chess/analysis'
 
 const W = 320
-const H = 84
+const H = 56
 const markColour: Record<Judgement, string> = { blunder: '#c0392b', mistake: '#d4a017', inaccuracy: '#7b8794' }
 
 /**
  * White's winning chance through the game: cream (White) below the curve, slate (Black) above it, so the
  * colour that fills the picture is the side that's ahead. Mistakes are dots; tap anywhere to go to that move.
  */
-export function EvalGraph({
+export const EvalGraph = memo(function EvalGraph({
   wins,
   marks,
   ply,
@@ -56,7 +57,7 @@ export function EvalGraph({
       ))}
     </svg>
   )
-}
+})
 
 /** A vertical bar beside the board: the cream part is White's share of the winning chances. */
 export function EvalBar({ white, whiteAtBottom, label }: { white: number; whiteAtBottom: boolean; label: string }) {

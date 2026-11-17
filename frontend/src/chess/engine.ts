@@ -17,7 +17,7 @@ export interface EngineWorker {
 }
 
 /** Live analysis: how deep to go and how many alternatives to show. Deep enough to be trusted, and it stops. */
-export const LIVE_DEPTH = 20
+export const LIVE_DEPTH = 18
 export const LIVE_LINES = 3
 
 export class Engine {
@@ -45,19 +45,26 @@ export class Engine {
     return engine
   }
 
-  /** Evaluates one position; the score comes back from White's side. */
-  async evaluate(fen: string): Promise<PositionEval> {
-    const toMove = fen.split(' ')[1] === 'b' ? 'b' : 'w'
-    let score: PositionEval['score'] | null = null
-    this.worker.postMessage(`position fen ${fen}`)
-    const done = await this.until(`go depth ${DEPTH} movetime ${MAX_MS}`, (line) => {
-      if (line.startsWith('info') && !line.includes(' upperbound') && !line.includes(' lowerbound')) {
-        score = scoreFromInfo(line, toMove) ?? score
-      }
-      return line.startsWith('bestmove')
+  /**
+   * Evaluates one position (for the whole-game review); the score comes back from White's side. Waits its
+   * turn behind, and stops, any live search, so one engine can do both.
+   */
+  evaluate(fen: string): Promise<PositionEval> {
+    return this.enqueue(async () => {
+      await this.halt()
+      this.setLines(1)
+      const toMove = fen.split(' ')[1] === 'b' ? 'b' : 'w'
+      let score: PositionEval['score'] | null = null
+      this.worker.postMessage(`position fen ${fen}`)
+      const done = await this.until(`go depth ${DEPTH} movetime ${MAX_MS}`, (line) => {
+        if (line.startsWith('info') && !line.includes(' upperbound') && !line.includes(' lowerbound')) {
+          score = scoreFromInfo(line, toMove) ?? score
+        }
+        return line.startsWith('bestmove')
+      })
+      const best = done.split(' ')[1]
+      return { score: score ?? { cp: 0 }, best: best && best !== '(none)' ? best : null }
     })
-    const best = done.split(' ')[1]
-    return { score: score ?? { cp: 0 }, best: best && best !== '(none)' ? best : null }
   }
 
   stop() {
@@ -69,12 +76,9 @@ export class Engine {
    * improves. A new call stops the previous search first, so the newest position always wins.
    */
   analyse(fen: string, onLine: (line: EngineLine) => void, { depth = LIVE_DEPTH, lines = LIVE_LINES } = {}): Promise<void> {
-    const next = this.queue.then(async () => {
+    return this.enqueue(async () => {
       await this.halt()
-      if (lines !== this.multiPv) {
-        this.worker.postMessage(`setoption name MultiPV value ${lines}`)
-        this.multiPv = lines
-      }
+      this.setLines(lines)
       const toMove = fen.split(' ')[1] === 'b' ? 'b' : 'w'
       this.worker.postMessage(`position fen ${fen}`)
       const search = this.until(`go depth ${depth}`, (line) => {
@@ -88,8 +92,22 @@ export class Engine {
         () => this.search === search && (this.search = null),
       )
     })
-    this.queue = next.catch(() => {})
+  }
+
+  /** Runs engine commands one job at a time, in order. */
+  private enqueue<T>(job: () => Promise<T>): Promise<T> {
+    const next = this.queue.then(job)
+    this.queue = next.then(
+      () => {},
+      () => {},
+    )
     return next
+  }
+
+  private setLines(lines: number) {
+    if (lines === this.multiPv) return
+    this.worker.postMessage(`setoption name MultiPV value ${lines}`)
+    this.multiPv = lines
   }
 
   /** Stops the live search, if any, and waits until the engine has really stopped. */

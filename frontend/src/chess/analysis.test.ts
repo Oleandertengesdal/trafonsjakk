@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   moveAccuracy,
   parseInfoLine,
+  moveWeights,
   playedLike,
+  playerAccuracy,
   pvToSan,
   positions,
   reviewGame,
@@ -183,5 +185,38 @@ describe('playedLike', () => {
   it('gives no estimate for a short game', () => {
     expect(playedLike({ accuracy: 95, moves: 9 })).toBeNull()
     expect(playedLike({ accuracy: 95, moves: 10 })).not.toBeNull()
+  })
+})
+
+describe('game accuracy (lichess)', () => {
+  it('weighs moves by how much the game was swinging around them', () => {
+    expect(moveWeights([50, 50, 50])).toEqual([0.5, 0.5])
+    const w = moveWeights([50, 50, 90, 10, 50])
+    expect(w).toHaveLength(4)
+    expect(w[0]).toBe(0.5)
+    expect(w[2]).toBe(12)
+    expect(moveWeights([50])).toEqual([])
+  })
+
+  it('has one weight per move, also for long games', () => {
+    const win = Array.from({ length: 81 }, (_, i) => 50 + 40 * Math.sin(i / 5))
+    const w = moveWeights(win)
+    expect(w).toHaveLength(80)
+    expect(w.every((x) => x >= 0.5 && x <= 12)).toBe(true)
+  })
+
+  it('averages a weighted and a harmonic mean', () => {
+    expect(playerAccuracy([100, 50], [1, 1])).toBeCloseTo((75 + 2 / (1 / 100 + 1 / 50)) / 2, 6)
+    expect(playerAccuracy([], [])).toBe(100)
+    // A move scored 0 counts as 1 in the harmonic mean, so it can't divide by zero
+    expect(playerAccuracy([0, 100], [1, 1])).toBeGreaterThan(0)
+  })
+
+  it("doesn't let a long, quiet, won endgame hide the blunders", () => {
+    const accuracies = [...Array(40).fill(100), 20, 20]
+    const weights = [...Array(40).fill(0.5), 12, 12]
+    const plain = accuracies.reduce((a, b) => a + b, 0) / accuracies.length
+    expect(plain).toBeGreaterThan(95)
+    expect(playerAccuracy(accuracies, weights)).toBeLessThan(75)
   })
 })

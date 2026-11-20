@@ -238,19 +238,57 @@ export function reviewGame(sans: string[], evals: PositionEval[]): GameReview {
       accuracy: moveAccuracy(winBefore, winAfter),
     })
   }
-  return { moves, white: summary(moves, 'w'), black: summary(moves, 'b') }
+  const weights = moveWeights(evals.slice(0, sans.length + 1).map((e) => winPercent(e.score)))
+  return { moves, white: summary(moves, 'w', weights), black: summary(moves, 'b', weights) }
 }
 
-function summary(moves: MoveReview[], side: 'w' | 'b'): SideSummary {
+function summary(moves: MoveReview[], side: 'w' | 'b', weights: number[]): SideSummary {
   const mine = moves.filter((m) => m.side === side)
   const count = (j: Judgement) => mine.filter((m) => m.judgement === j).length
   return {
     moves: mine.length,
-    accuracy: mine.length ? mine.reduce((s, m) => s + m.accuracy, 0) / mine.length : 100,
+    accuracy: playerAccuracy(
+      mine.map((m) => m.accuracy),
+      mine.map((m) => weights[m.ply - 1]),
+    ),
     blunders: count('blunder'),
     mistakes: count('mistake'),
     inaccuracies: count('inaccuracy'),
   }
+}
+
+/**
+ * How much each move counts towards a player's accuracy (lichess's game accuracy): the spread (standard
+ * deviation, 0.5–12) of White's winning chance in a window of positions around the move. Moves made while
+ * the game swings count for more than moves in a quiet or already decided position, so a long, easy, won
+ * endgame doesn't inflate the score. `win` is White's winning chance in every position, start included.
+ */
+export function moveWeights(win: number[]): number[] {
+  const moves = win.length - 1
+  if (moves < 1) return []
+  const size = Math.max(2, Math.min(8, Math.floor(moves / 10)))
+  const windows: number[][] = []
+  for (let i = 0; i < Math.min(size, win.length) - 2; i++) windows.push(win.slice(0, size))
+  if (win.length <= size) windows.push(win)
+  else for (let i = 0; i + size <= win.length; i++) windows.push(win.slice(i, i + size))
+  return windows.slice(0, moves).map((w) => {
+    const mean = w.reduce((a, b) => a + b, 0) / w.length
+    const sd = Math.sqrt(w.reduce((a, b) => a + (b - mean) ** 2, 0) / w.length)
+    return Math.max(0.5, Math.min(12, sd))
+  })
+}
+
+/**
+ * One player's accuracy for the game, as lichess computes it: the average of a weighted mean (weights from
+ * `moveWeights`) and a harmonic mean of the move accuracies. The harmonic mean makes a few terrible moves
+ * cost more than many good moves make up for. 100 for a player without moves.
+ */
+export function playerAccuracy(accuracies: number[], weights: number[]): number {
+  if (accuracies.length === 0) return 100
+  const totalWeight = weights.reduce((a, b) => a + b, 0)
+  const weighted = accuracies.reduce((a, x, i) => a + x * weights[i], 0) / totalWeight
+  const harmonic = accuracies.length / accuracies.reduce((a, x) => a + 1 / Math.max(1, x), 0)
+  return (weighted + harmonic) / 2
 }
 
 /**

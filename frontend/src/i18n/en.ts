@@ -928,7 +928,8 @@ export const en = {
       'live.out_of_date': 'Someone else saved moves in the meantime.',
       'live.not_running': 'This game has already ended.',
       'chat.not_configured': 'Google Chat isn’t set up on the server.',
-      'chat.failed': 'Google Chat didn’t accept the message. Check that the webhook link is still valid.',
+      'chat.failed': (p: Record<string, unknown>) =>
+        `Google Chat didn’t accept the message${typeof p.reason === 'string' ? ` (${p.reason})` : ''}. Check that the webhook link is complete and still valid.`,
       'live.not_found': 'That live game doesn’t exist.',
       'user.not_found': 'User not found.',
       'player.not_found': 'Player not found.',

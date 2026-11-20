@@ -14,8 +14,7 @@ class GoogleChatClientTest {
 
     @Test
     void acceptsOnlyAGoogleChatWebhookLink() {
-        assertThat(GoogleChatClient.webhookUri(LINK)).hasValueSatisfying(u -> assertThat(u.toString())
-                .isEqualTo(LINK + "&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD"));
+        assertThat(GoogleChatClient.webhookUri(LINK)).hasValueSatisfying(u -> assertThat(u.toString()).isEqualTo(LINK));
         assertThat(GoogleChatClient.webhookUri("  " + LINK + "\n")).isPresent();
         assertThat(GoogleChatClient.webhookUri("http://127.0.0.1:8099/v1/spaces/T/messages?key=k&token=t")).isPresent();
 
@@ -31,9 +30,18 @@ class GoogleChatClientTest {
     }
 
     @Test
-    void keepsAReplyOptionThatIsAlreadyThere() {
-        String own = LINK + "&messageReplyOption=REPLY_MESSAGE_OR_FAIL";
-        assertThat(GoogleChatClient.webhookUri(own)).hasValueSatisfying(u -> assertThat(u.toString()).isEqualTo(own));
+    void choosesTheThreadOptionPerMessageNotFromTheLink() {
+        assertThat(GoogleChatClient.webhookUri(LINK + "&messageReplyOption=REPLY_MESSAGE_OR_FAIL"))
+                .hasValueSatisfying(u -> assertThat(u.toString()).isEqualTo(LINK));
+    }
+
+    @Test
+    void readsGooglesExplanationFromAnErrorAnswer() {
+        assertThat(GoogleChatClient.googleMessage("{\"error\":{\"code\":403,\"message\":\"Webhooks are  disabled.\"}}"))
+                .isEqualTo(": Webhooks are disabled.");
+        assertThat(GoogleChatClient.googleMessage("<html>nope</html>")).isEmpty();
+        assertThat(GoogleChatClient.googleMessage("")).isEmpty();
+        assertThat(GoogleChatClient.googleMessage(null)).isEmpty();
     }
 
     @Test

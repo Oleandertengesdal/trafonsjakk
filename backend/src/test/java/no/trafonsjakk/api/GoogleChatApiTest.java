@@ -26,6 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 class GoogleChatApiTest extends IntegrationTest {
 
     private static final BlockingQueue<Received> RECEIVED = new LinkedBlockingQueue<>();
+    /** What the stand-in answers: 200, or an error like Google's. */
+    private static volatile int answer = 200;
     private static final HttpServer CHAT = startChat();
 
     record Received(String query, JsonNode body) {
@@ -37,7 +39,14 @@ class GoogleChatApiTest extends IntegrationTest {
             server.createContext("/v1/spaces/TEST/messages", exchange -> {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 RECEIVED.add(new Received(exchange.getRequestURI().getRawQuery(), JsonMapper.builder().build().readTree(body)));
-                exchange.sendResponseHeaders(200, -1);
+                if (answer == 200) {
+                    exchange.sendResponseHeaders(200, -1);
+                } else {
+                    byte[] error = ("{\"error\":{\"code\":" + answer + ",\"message\":\"Webhooks are disabled.\",\"status\":\"PERMISSION_DENIED\"}}")
+                            .getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(answer, error.length);
+                    exchange.getResponseBody().write(error);
+                }
                 exchange.close();
             });
             server.start();
@@ -70,6 +79,7 @@ class GoogleChatApiTest extends IntegrationTest {
         alice = registerMember(admin, "alice");
         bob = registerMember(admin, "bob");
         RECEIVED.clear();
+        answer = 200;
     }
 
     private static Received next() throws InterruptedException {
@@ -120,7 +130,21 @@ class GoogleChatApiTest extends IntegrationTest {
     void anAdminCanSeeThatChatIsOnAndSendATestMessage() throws InterruptedException {
         assertThat(admin.api().get("/api/admin/chat").json().path("configured").asBoolean()).isTrue();
         assertThat(admin.api().post("/api/admin/chat/test").status()).isEqualTo(204);
-        assertThat(next().body().path("text").asString()).contains("koblet til");
+        Received test = next();
+        assertThat(test.body().path("text").asString()).contains("koblet til");
+        assertThat(test.body().has("thread")).isFalse();
+        assertThat(test.query()).isEqualTo("key=k&token=t");
         assertThat(alice.api().post("/api/admin/chat/test").status()).isEqualTo(403);
+    }
+
+    @Test
+    void whenGoogleRefusesTheAdminSeesWhy() {
+        answer = 403;
+        Response test = admin.api().post("/api/admin/chat/test");
+        assertThat(test.status()).isEqualTo(502);
+        assertThat(test.code()).isEqualTo("chat.failed");
+        assertThat(test.json().path("params").path("reason").asString())
+                .isEqualTo("Google answered 403: Webhooks are disabled.");
+        assertThat(test.json().toString()).doesNotContain("token=");
     }
 }

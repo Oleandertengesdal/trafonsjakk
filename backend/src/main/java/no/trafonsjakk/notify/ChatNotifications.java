@@ -49,15 +49,15 @@ public class ChatNotifications {
         chat.post(ChatMessages.gameLogged(e, site), thread);
     }
 
-    /** For the admin page's "send a test message": waits for Chat's answer. */
-    public boolean sendTest() {
+    /** For the admin page's "send a test message": waits for Chat's answer. Null if it arrived, else why not. */
+    public String sendTest() {
         try {
             return chat.post(ChatMessages.test(), null).get(30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return "interrupted";
         } catch (ExecutionException | TimeoutException e) {
-            return false;
+            return "no answer from Google Chat in time";
         }
     }
 }

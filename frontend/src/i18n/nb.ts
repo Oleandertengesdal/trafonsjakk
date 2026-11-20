@@ -923,7 +923,8 @@ export const nb: Dict = {
       'live.out_of_date': 'Noen andre lagret trekk i mellomtiden.',
       'live.not_running': 'Dette partiet er allerede ferdig.',
       'chat.not_configured': 'Google Chat er ikke satt opp på serveren.',
-      'chat.failed': 'Google Chat tok ikke imot meldingen. Sjekk at webhook-lenken fortsatt gjelder.',
+      'chat.failed': (p) =>
+        `Google Chat tok ikke imot meldingen${typeof p.reason === 'string' ? ` (${p.reason})` : ''}. Sjekk at webhook-lenken er hel og fortsatt gjelder.`,
       'live.not_found': 'Det direktepartiet finnes ikke.',
       'user.not_found': 'Fant ikke brukeren.',
       'player.not_found': 'Fant ikke spilleren.',

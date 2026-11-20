@@ -245,7 +245,7 @@ A game being played right now. A player (or an admin) records it on a phone: eve
 | POST | `/admin/users/{id}/password-reset` | → 201 `{ token, expiresAt }`. One-time link (`/reset-password?token=…`), valid 24 h; a new link cancels the previous one. Not for yourself (`admin.cannot_change_self`) or disabled accounts (`user.disabled`). |
 | POST | `/admin/ratings/recompute` | Forces a full recompute → `{ games, players, millis }` |
 | GET | `/admin/chat` | `{ configured }`: whether Google Chat messages are on. The webhook link itself is never returned. |
-| POST | `/admin/chat/test` | Sends a test message to the Google Chat space and waits for Google's answer → 204. `chat.not_configured` (409) without `GOOGLE_CHAT_WEBHOOK_URL`; `chat.failed` (502) if Google refused it or couldn't be reached. |
+| POST | `/admin/chat/test` | Sends a test message to the Google Chat space and waits for Google's answer → 204. `chat.not_configured` (409) without `GOOGLE_CHAT_WEBHOOK_URL`; `chat.failed` (502) if Google refused it or couldn't be reached, with `params.reason` saying why (e.g. `Google answered 403: …` with Google's own explanation; never the link). |
 
 **Google Chat.** With `GOOGLE_CHAT_WEBHOOK_URL` set, starting a live game (`POST /live`) and logging a game (`POST /games`, or finishing a live game) also post a short message to the space, once the change is saved. A finished live game's result is a reply in the same thread as its start. Games dated more than 3 days back aren't announced. This never affects the response: sending happens afterwards, in the background (see `docs/DEPLOYMENT.md`).
 

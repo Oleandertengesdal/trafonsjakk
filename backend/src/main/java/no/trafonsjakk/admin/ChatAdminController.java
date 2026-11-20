@@ -1,5 +1,6 @@
 package no.trafonsjakk.admin;
 
+import java.util.Map;
 import no.trafonsjakk.common.ApiException;
 import no.trafonsjakk.notify.ChatNotifications;
 import no.trafonsjakk.notify.GoogleChatClient;
@@ -37,8 +38,10 @@ public class ChatAdminController {
         if (!chat.configured()) {
             throw ApiException.conflict("chat.not_configured", "Google Chat isn't set up on the server");
         }
-        if (!notifications.sendTest()) {
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "chat.failed", "Google Chat didn't accept the message", null, null);
+        String failure = notifications.sendTest();
+        if (failure != null) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "chat.failed", "Google Chat didn't accept the message: " + failure,
+                    Map.of("reason", failure), null);
         }
     }
 }

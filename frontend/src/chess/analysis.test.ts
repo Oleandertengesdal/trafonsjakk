@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   moveAccuracy,
   parseInfoLine,
+  playedLike,
   pvToSan,
   positions,
   reviewGame,
@@ -161,5 +162,26 @@ describe('reviewGame', () => {
     expect(pvToSan(start, ['e2e4', 'e7e5', 'g1f3', 'b8c6'])).toEqual(['e4', 'e5', 'Nf3', 'Nc6'])
     expect(pvToSan(start, ['e2e4', 'e7e5', 'e1e3'])).toEqual(['e4', 'e5'])
     expect(pvToSan(start, ['e2e4', 'e7e5', 'g1f3'], 2)).toEqual(['e4', 'e5'])
+  })
+})
+
+describe('playedLike', () => {
+  it('turns accuracy into a rough rating, to the nearest 50', () => {
+    expect(playedLike({ accuracy: 75, moves: 30 })).toBe(1200)
+    expect(playedLike({ accuracy: 82, moves: 30 })).toBe(1550)
+    expect(playedLike({ accuracy: 90, moves: 30 })).toBe(2000)
+  })
+
+  it('rises with accuracy and stays between 400 and 2800', () => {
+    const ratings = [0, 30, 50, 55, 65, 72, 78, 83, 88, 93, 96, 98, 99.5, 100].map((accuracy) => playedLike({ accuracy, moves: 40 })!)
+    expect(ratings).toEqual([...ratings].sort((a, b) => a - b))
+    expect(ratings[0]).toBe(400)
+    expect(ratings.at(-1)).toBe(2800)
+    expect(ratings.every((r) => r % 50 === 0)).toBe(true)
+  })
+
+  it('gives no estimate for a short game', () => {
+    expect(playedLike({ accuracy: 95, moves: 9 })).toBeNull()
+    expect(playedLike({ accuracy: 95, moves: 10 })).not.toBeNull()
   })
 })

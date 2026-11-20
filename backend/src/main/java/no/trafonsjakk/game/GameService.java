@@ -14,6 +14,7 @@ import no.trafonsjakk.game.GameDtos.CreateGameRequest;
 import no.trafonsjakk.game.GameDtos.GameDto;
 import no.trafonsjakk.game.GameDtos.ResolveAction;
 import no.trafonsjakk.game.GameDtos.ResolveRequest;
+import no.trafonsjakk.notify.ChatEvents.GameLogged;
 import no.trafonsjakk.rating.RatingService;
 import no.trafonsjakk.tournament.MatchStatus;
 import no.trafonsjakk.tournament.TournamentMatch;
@@ -22,6 +23,7 @@ import no.trafonsjakk.tournament.TournamentService;
 import no.trafonsjakk.tournament.TournamentStatus;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -42,11 +44,13 @@ public class GameService {
     private final RatingService ratings;
     private final GameMapper mapper;
     private final AppProperties props;
+    private final ApplicationEventPublisher events;
 
     public GameService(GameRepository games, UserRepository users, TournamentMatchRepository matches,
                        TournamentService tournaments, RatingService ratings, GameMapper mapper,
-                       AppProperties props) {
+                       AppProperties props, ApplicationEventPublisher events) {
         this.props = props;
+        this.events = events;
         this.games = games;
         this.users = users;
         this.matches = matches;
@@ -153,7 +157,10 @@ public class GameService {
             }
             game.setMatch(match);
         }
-        return mapper.toDto(games.save(game), actor);
+        Game saved = games.save(game);
+        events.publishEvent(new GameLogged(saved.getId(), white.getRealName(), black.getRealName(), saved.getResult(),
+                saved.getPlayedAt(), saved.getMatch() == null ? null : saved.getMatch().getTournament().getName()));
+        return mapper.toDto(saved, actor);
     }
 
     @Transactional

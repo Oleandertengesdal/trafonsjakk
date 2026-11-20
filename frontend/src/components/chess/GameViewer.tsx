@@ -7,6 +7,7 @@ import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, FlipVertical2, X 
 import {
   glyph,
   numberedLine,
+  playedLike,
   playFrom,
   positions,
   reviewGame,
@@ -296,9 +297,10 @@ function Accuracy({ review, whiteName, blackName }: { review: GameReview; whiteN
   const { t, f } = useI18n()
   const a = t.analysis
   const rows = [
-    { name: whiteName, side: review.white },
-    { name: blackName, side: review.black },
+    { name: whiteName, side: review.white, rating: playedLike(review.white) },
+    { name: blackName, side: review.black, rating: playedLike(review.black) },
   ]
+  const estimates = rows.some((r) => r.rating !== null)
   const marks = (s: GameReview['white']) =>
     (
       [
@@ -331,6 +333,11 @@ function Accuracy({ review, whiteName, blackName }: { review: GameReview; whiteN
               </th>
               <td className="py-1 pr-3 text-right font-display text-base font-semibold tabular-nums" title={a.accuracy}>
                 {f.pct(r.side.accuracy / 100)}
+                {r.rating !== null && (
+                  <span className="block font-sans text-[0.8125rem] font-normal text-muted" title={`${a.playedLike} ≈${r.rating}`}>
+                    <span className="sr-only">{a.playedLike} </span>≈{r.rating}
+                  </span>
+                )}
               </td>
               <td className="py-1 text-right text-[0.8125rem] text-muted">
                 {marks(r.side).length === 0
@@ -346,6 +353,7 @@ function Accuracy({ review, whiteName, blackName }: { review: GameReview; whiteN
           ))}
         </tbody>
       </table>
+      {estimates && <p className="mt-1.5 text-[0.75rem] text-muted">{a.playedLikeNote}</p>}
       <p className="mt-1.5 text-[0.75rem] text-faint">
         {a.accuracy}. {a.credit},{' '}
         <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noreferrer" className="underline hover:text-accent">

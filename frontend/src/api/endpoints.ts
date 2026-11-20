@@ -156,6 +156,8 @@ export const adminApi = {
     api<{ token: string; expiresAt: string }>(`/api/admin/users/${userId}/password-reset`, { method: 'POST' }),
   recompute: () =>
     api<{ games: number; players: number; millis: number }>('/api/admin/ratings/recompute', { method: 'POST' }),
+  chat: () => api<{ configured: boolean }>('/api/admin/chat'),
+  chatTest: () => api<void>('/api/admin/chat/test', { method: 'POST' }),
 }
 
 export const liveApi = {

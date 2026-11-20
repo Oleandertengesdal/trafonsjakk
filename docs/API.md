@@ -24,6 +24,7 @@ The full list of codes and their Norwegian/English texts lives in `frontend/src/
 | 413 | Request body over 128 KB (`request.too_large`) |
 | 429 | Too many attempts (login lockout, rate limit). `Retry-After` header is set. |
 | 500 | A bug (`server_error`). The body has a **`ref`**, a six-character error code like `K7Q2MX` that is also in the server log next to the stack trace, so a report that quotes it finds the right line. Nothing else about the failure is sent. |
+| 502 | Only `POST /admin/chat/test`: Google Chat didn't accept the message (`chat.failed`). |
 | 503 | The database isn't answering, usually Neon waking up (`server.unavailable`). `Retry-After: 10`; try again shortly. |
 
 Errors that happen outside the controllers (in a security filter, for example) get the same shape: `/error` answers with problem JSON too, and opening `/error` directly is a plain `404 not_found`.
@@ -243,6 +244,10 @@ A game being played right now. A player (or an admin) records it on a phone: eve
 | PATCH | `/admin/users/{id}` | `{ role?, enabled? }`. You can't demote or disable yourself, and a deleted account can't be changed (`admin.user_deleted`; `AdminUser.deleted` is true). Disabling also cancels their unused invite codes and open password links. |
 | POST | `/admin/users/{id}/password-reset` | → 201 `{ token, expiresAt }`. One-time link (`/reset-password?token=…`), valid 24 h; a new link cancels the previous one. Not for yourself (`admin.cannot_change_self`) or disabled accounts (`user.disabled`). |
 | POST | `/admin/ratings/recompute` | Forces a full recompute → `{ games, players, millis }` |
+| GET | `/admin/chat` | `{ configured }`: whether Google Chat messages are on. The webhook link itself is never returned. |
+| POST | `/admin/chat/test` | Sends a test message to the Google Chat space and waits for Google's answer → 204. `chat.not_configured` (409) without `GOOGLE_CHAT_WEBHOOK_URL`; `chat.failed` (502) if Google refused it or couldn't be reached. |
+
+**Google Chat.** With `GOOGLE_CHAT_WEBHOOK_URL` set, starting a live game (`POST /live`) and logging a game (`POST /games`, or finishing a live game) also post a short message to the space, once the change is saved. A finished live game's result is a reply in the same thread as its start. Games dated more than 3 days back aren't announced. This never affects the response: sending happens afterwards, in the background (see `docs/DEPLOYMENT.md`).
 
 ## Health
 

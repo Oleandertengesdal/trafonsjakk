@@ -229,7 +229,8 @@ class SecurityApiTest extends IntegrationTest {
         return List.of(new Call("GET", "/api/admin/games/disputed"), new Call("POST", "/api/admin/games/1/resolve"),
                 new Call("GET", "/api/admin/users"), new Call("PATCH", "/api/admin/users/1"),
                 new Call("POST", "/api/admin/users/1/password-reset"),
-                new Call("POST", "/api/admin/ratings/recompute"));
+                new Call("POST", "/api/admin/ratings/recompute"), new Call("GET", "/api/admin/chat"),
+                new Call("POST", "/api/admin/chat/test"));
     }
 
     private static Response call(ApiSession s, Call c) {

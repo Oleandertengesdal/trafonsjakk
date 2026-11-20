@@ -39,6 +39,8 @@ export interface MoveReview {
 }
 
 export interface SideSummary {
+  /** Moves this side played. */
+  moves: number
   accuracy: number
   blunders: number
   mistakes: number
@@ -243,11 +245,57 @@ function summary(moves: MoveReview[], side: 'w' | 'b'): SideSummary {
   const mine = moves.filter((m) => m.side === side)
   const count = (j: Judgement) => mine.filter((m) => m.judgement === j).length
   return {
+    moves: mine.length,
     accuracy: mine.length ? mine.reduce((s, m) => s + m.accuracy, 0) / mine.length : 100,
     blunders: count('blunder'),
     mistakes: count('mistake'),
     inaccuracies: count('inaccuracy'),
   }
+}
+
+/**
+ * Accuracy → rating, roughly where players of that strength tend to land in one game. There's no agreed
+ * formula: these points follow the published rules of thumb (casual players score in the 70s, club players
+ * in the low to mid 80s, 90+ is very clean play), and studies find that one game's accuracy explains only a
+ * small part of the difference between players' ratings.
+ */
+const STRENGTH: [accuracy: number, rating: number][] = [
+  [50, 400],
+  [60, 700],
+  [70, 1000],
+  [75, 1200],
+  [80, 1450],
+  [85, 1700],
+  [90, 2000],
+  [95, 2400],
+  [98, 2700],
+]
+
+/** Fewer moves than this and one slip decides everything: no estimate. */
+export const STRENGTH_MIN_MOVES = 10
+
+/**
+ * "Played like a 1450": a rough rating for one side's play in one game, from its accuracy, to the nearest
+ * 50 and between 400 and 2800. Null for short games. One game can be several hundred points off.
+ */
+export function playedLike(side: Pick<SideSummary, 'accuracy' | 'moves'>): number | null {
+  if (side.moves < STRENGTH_MIN_MOVES) return null
+  const a = side.accuracy
+  let rating: number
+  if (a <= STRENGTH[0][0]) {
+    rating = STRENGTH[0][1]
+  } else {
+    const i = STRENGTH.findIndex(([acc]) => acc >= a)
+    if (i === -1) {
+      const [[a1, r1], [a2, r2]] = STRENGTH.slice(-2)
+      rating = r2 + ((a - a2) * (r2 - r1)) / (a2 - a1)
+    } else {
+      const [a1, r1] = STRENGTH[i - 1]
+      const [a2, r2] = STRENGTH[i]
+      rating = r1 + ((a - a1) * (r2 - r1)) / (a2 - a1)
+    }
+  }
+  return Math.round(Math.max(400, Math.min(2800, rating)) / 50) * 50
 }
 
 function uciOf(fen: string, san: string): string {

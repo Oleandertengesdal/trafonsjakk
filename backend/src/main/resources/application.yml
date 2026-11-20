@@ -68,6 +68,14 @@ app:
   cookies:
     secure: true
   bootstrap-invite-code: ${BOOTSTRAP_INVITE_CODE:}
+  # Where the website lives (e.g. https://trafonsjakk.vercel.app), for links in chat messages. Optional.
+  public-url: ${APP_PUBLIC_URL:}
+  google-chat:
+    # The space's incoming-webhook link (Space > Apps & integrations > Webhooks). It contains a secret token:
+    # set it as an environment variable, never in this file. Blank = no chat messages.
+    webhook-url: ${GOOGLE_CHAT_WEBHOOK_URL:}
+    # Google Chat accepts about one message a second per space
+    min-interval: 1100ms
   games:
     auto-confirm-after: 48h
     # How far back a member may date a game they log. Admins have no limit (old games, corrections).

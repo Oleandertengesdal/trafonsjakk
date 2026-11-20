@@ -11,8 +11,10 @@ import no.trafonsjakk.game.GameResult;
 import no.trafonsjakk.game.GameService;
 import no.trafonsjakk.live.LiveDtos.LiveGameDto;
 import no.trafonsjakk.live.LiveDtos.StartLiveRequest;
+import no.trafonsjakk.notify.ChatEvents.LiveGameStarted;
 import no.trafonsjakk.user.User;
 import no.trafonsjakk.user.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +33,10 @@ public class LiveGameService {
     private final LiveGameRepository live;
     private final UserRepository users;
     private final GameService games;
+    private final ApplicationEventPublisher events;
 
-    public LiveGameService(LiveGameRepository live, UserRepository users, GameService games) {
+    public LiveGameService(LiveGameRepository live, UserRepository users, GameService games, ApplicationEventPublisher events) {
+        this.events = events;
         this.live = live;
         this.users = users;
         this.games = games;
@@ -79,7 +83,9 @@ public class LiveGameService {
         User white = activeUser(req.whiteId());
         User black = activeUser(req.blackId());
         User starter = users.findById(actor.id()).orElseThrow(() -> ApiException.unauthorized("auth.not_logged_in", "Not logged in"));
-        return LiveGameDto.of(live.save(new LiveGame(white, black, starter, now)), actor);
+        LiveGame g = live.save(new LiveGame(white, black, starter, now));
+        events.publishEvent(new LiveGameStarted(g.getId(), white.getRealName(), black.getRealName()));
+        return LiveGameDto.of(g, actor);
     }
 
     @Transactional

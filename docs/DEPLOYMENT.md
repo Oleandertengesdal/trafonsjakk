@@ -87,6 +87,12 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 ## Step 6 (optional): Nice-to-haves
 
 - **Error alerts (Sentry, free plan):** create a project at sentry.io (platform: React). In its settings, turn on *Prevent Storing of IP Addresses*. Copy the DSN, add it in Vercel → Project → Settings → Environment Variables as `VITE_SENTRY_DSN` (Production), and redeploy. You then get an email when someone's browser crashes or the API returns a 500. The DSN isn't a secret (it ends up in the public JavaScript, as Sentry intends), but keep it out of Git anyway. Remove the variable and redeploy to switch it off.
+- **Google Chat messages:** a message in a Google Chat space when a live game starts and when a game is logged (a finished live game's result goes in the same thread as its start).
+  1. In Google Chat, open the space → its name at the top → **Apps & integrations** → **Webhooks** → **Add webhook**. Give it a name (e.g. *Trafonsjakk*) and save. Copy the link. It looks like `https://chat.googleapis.com/v1/spaces/…/messages?key=…&token=…`.
+  2. In Render → the service → **Environment**, add `GOOGLE_CHAT_WEBHOOK_URL` with that link, and `APP_PUBLIC_URL` with the site's address (e.g. `https://<project>.vercel.app`, used for the "Følg direkte" / "Se partiet" links). Save; the service restarts.
+  3. As admin, open **Admin → Google Chat → Send a test message**.
+
+  This needs a Google Workspace account (incoming webhooks aren't offered for personal Gmail accounts), and the Workspace admin must allow webhooks. **The link is a secret:** anyone who has it can post in the space. Keep it in Render only, never in a file in the repo. Leave the variable out to turn messages off. Messages are in Norwegian; games dated more than 3 days back (old results entered afterwards) aren't announced.
 - **On the tablet or phones:** open the site and choose *Add to Home Screen* (Safari: the share button; Chrome: the menu or the install prompt). It then opens full screen like an app, and the screen stays on during live games.
 - **TV at the venue:** open `/tv` on the TV's browser (or a laptop on HDMI), log in once, and press the full-screen button. The browser stays logged in for up to 30 days of use.
 
@@ -100,7 +106,7 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 ## Before you push
 
 - `git status` should show **no** `.env`, `.env.local` or `application-local.yml` files. They're git-ignored, but check anyway.
-- Real secrets live **only** in Render's environment settings: `JWT_SECRET`, the `DATABASE_*` values and `BOOTSTRAP_INVITE_CODE`.
+- Real secrets live **only** in Render's environment settings: `JWT_SECRET`, the `DATABASE_*` values, `BOOTSTRAP_INVITE_CODE` and `GOOGLE_CHAT_WEBHOOK_URL`.
 - The only credential-looking values in the repo are the documented local-dev placeholders (`trafonsjakk` DB password, `dev-only-insecure-jwt-secret…`, `let-me-in`). The prod profile refuses to start with the dev JWT secret.
 - CI runs gitleaks on every push and fails the build if anything secret-shaped shows up.
 
@@ -119,6 +125,8 @@ Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter`
 | Need to fix ratings | Admin → **Recompute ratings** replays every confirmed game. This is safe to run at any time. |
 | Rotate `JWT_SECRET` | Change it in Render. Everyone is logged out once; nothing else is affected. |
 | Leaked DB password | Reset it in Neon, update `DATABASE_PASSWORD` in Render. |
+| Leaked Google Chat webhook link | In the space, delete the webhook (Apps & integrations → Webhooks) and add a new one; put the new link in `GOOGLE_CHAT_WEBHOOK_URL`. |
+| Chat messages stop | Admin → Google Chat → **Send a test message** says whether Google accepts them. The Render log says why one was dropped (it never shows the link). Messages that fail because Google is busy are retried twice. |
 
 ## Scaling past the free tier
 

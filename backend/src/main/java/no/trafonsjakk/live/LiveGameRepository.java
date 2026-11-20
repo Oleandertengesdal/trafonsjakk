@@ -20,6 +20,10 @@ public interface LiveGameRepository extends JpaRepository<LiveGame, Long> {
     @Query("select g from LiveGame g join fetch g.white join fetch g.black where g.id = :id")
     Optional<LiveGame> findWithPlayers(@Param("id") Long id);
 
+    /** The live game a logged game came from, if it came from one. */
+    @Query("select g.id from LiveGame g where g.gameId = :gameId")
+    Optional<Long> findIdByGameId(@Param("gameId") Long gameId);
+
     /** Locks the row: two phones saving at once are handled one after the other. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from LiveGame g join fetch g.white join fetch g.black where g.id = :id")

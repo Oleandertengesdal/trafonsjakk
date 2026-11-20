@@ -27,10 +27,14 @@ flowchart LR
     subgraph Neon
         DB[(PostgreSQL)]
     end
+    subgraph Google
+        Chat[Google Chat space<br/>optional]
+    end
     SPA -- "HTML/JS/CSS" --> Static
     SPA -- "fetch /api/... (same origin, cookies)" --> Rewrite
     Rewrite -- HTTPS --> API
     API -- "JDBC/TLS" --> DB
+    API -. "webhook (HTTPS)" .-> Chat
 ```
 
 **Key choice: one origin.** In production the browser only ever talks to the Vercel domain. Vercel serves the SPA and *proxies* `/api/*` to the Spring Boot service. Because API calls are same-origin:
@@ -275,7 +279,8 @@ no.trafonsjakk
 │                  repositories, TournamentService, TournamentController,
 │                  RoundRobinScheduler, KnockoutBracket, StandingsCalculator (pure)
 ├── stats/         PlayerStatsCalculator (pure), StatsService
-└── admin/         AdminController
+├── notify/        ChatEvents, ChatNotifications (listener), ChatMessages (texts), GoogleChatClient
+└── admin/         AdminController, ChatAdminController
 ```
 
 Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`, `YearReviewCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
@@ -394,6 +399,12 @@ Two awards per calendar month (Norwegian time), from confirmed games only:
 
 Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board follows the game, they can step back through the moves (and jump back to the live position, with a count of the moves they missed), and they can switch on **Analyse**. The engine (the same in-browser Stockfish and the same parts as the game analysis: `useStockfish`, `AnalysisBoard`, `EnginePanel`) searches whatever position is on the board to depth 18 with three lines (MultiPV), reporting as it deepens; a new move or stepping back stops the old search and starts a new one. The page shows an evaluation bar, an arrow for the best move and the three best continuations. **Fair play:** the players (and anyone recording the game) never get this view during the game, and the TV shows no evaluation, since players can see it. This is a guard in the interface, not a lock: a player could still open the page logged in as someone else.
 
+### 3.9b Google Chat messages (optional)
+
+With `GOOGLE_CHAT_WEBHOOK_URL` set, the API posts to a Google Chat space through its incoming webhook. `LiveGameService.start` and `GameService.create` publish `LiveGameStarted` / `GameLogged` events; `ChatNotifications` handles them with `@TransactionalEventListener`, so a message is only sent once the change has been committed (a refused request announces nothing). The text (Norwegian, names escaped) comes from `ChatMessages`; the link to the site uses `APP_PUBLIC_URL` and is left out without it. Each message has a `threadKey`: `live-<id>` for a live game and for the game it turns into, so the result is a reply under the start, otherwise `game-<id>`. Games dated more than 3 days back aren't announced.
+
+`GoogleChatClient` sends from one background thread with a bounded queue (100), at most one message every 1.1 s (Chat's limit is one a second per space), 5 s connect and 10 s request timeouts, and two retries with backoff for 429, 5xx and network errors. Other answers (a deleted webhook, say) drop the message with a warning. It only accepts `https://chat.googleapis.com/v1/spaces/…` links (plain `http` on localhost for tests); anything else logs an error at startup and leaves chat off. The link is a secret and is never logged. Admin → Google Chat shows whether it's on and sends a test message.
+
 ### 3.10 Your data and deleting an account
 
 `AccountService.export` collects everything stored about the person with plain SQL. `delete` (password required, same lockout as login) keeps the games and rating history, because they are the opponents' history too, and removes what identifies the person: see [API.md](API.md#users). `users.deleted_at` marks it so an admin can't switch it back on, and `deleted_` usernames can't be registered.
@@ -499,7 +510,7 @@ Analysis is optional and only offered for games with recorded moves. Nothing run
 
 1. `Engine.load()` starts Stockfish 18 (the 7 MB "lite, single-threaded" WebAssembly build in `public/engine`, GPLv3, served unmodified from our own origin) in a **Web Worker** and does the UCI handshake. Single-threaded means no cross-origin-isolation headers are needed. The worker is terminated when analysis is switched off or the page closes.
 2. **Review**, once per game: every position is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so the next time it's instant. Nothing is sent to the server.
-3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, averaged per player.
+3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, averaged per player. `playedLike()` turns a player's accuracy into a rough rating ("≈1450", shown under the accuracy) by interpolating between rule-of-thumb points (75 % ≈ 1200, 80 % ≈ 1450, 85 % ≈ 1700, 90 % ≈ 2000, …), rounded to 50 and kept between 400 and 2800, and only for a player with at least 10 moves. There's no agreed formula for this, and one game's accuracy says little about a player's rating (studies find it explains only a small part of the difference), so the page says it's a rough estimate for this game.
 4. **Live lines**, after the review: the same engine thinks about the position on the board to depth 18 with its three best lines (MultiPV), reporting as it looks deeper. `Engine` runs one job at a time (`enqueue`): a new position stops the old search first, and a review position goes back to one line.
 5. With analysis on, the viewer shows the evaluation bar, a graph of the game (tap to jump), the marks in the move list, one sentence about the move just played ("Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine panel with its three lines and the depth, and accuracy per player. With it off, the page is just the board, the moves and a few numbers about the game.
 6. **Your own moves:** with analysis on you can drag a piece, tap a piece and then a square, or tap one of the engine's lines. The game's own next move just steps forward; anything else starts *your own line* branching off the game, which the engine follows. "Previous move" takes back your last move; the ✕ (or stepping through the game) goes back to the game.

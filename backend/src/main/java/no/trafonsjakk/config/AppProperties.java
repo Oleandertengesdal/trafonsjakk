@@ -12,7 +12,9 @@ public record AppProperties(
         Games games,
         Invites invites,
         Security security,
-        Awards awards) {
+        Awards awards,
+        String publicUrl,
+        GoogleChat googleChat) {
 
     public record Jwt(String secret, String issuer, Duration accessTokenTtl, Duration refreshTokenTtl) {
     }
@@ -29,6 +31,14 @@ public record AppProperties(
     }
 
     public record Invites(Duration ttl, int maxActivePerUser) {
+    }
+
+    /**
+     * Messages to a Google Chat space when a live game starts or a game is logged. {@code webhookUrl} is the
+     * space's incoming-webhook link, which carries its own secret token: environment variable only, never
+     * logged. Blank turns notifications off. {@code minInterval} keeps within Chat's one message a second.
+     */
+    public record GoogleChat(String webhookUrl, Duration minInterval) {
     }
 
     /**

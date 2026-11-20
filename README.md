@@ -11,11 +11,12 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 - **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
 - **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
 - **Live games:** start a game when you sit down, record each move on a phone as you play (saved straight away), and tap the result at the end. Everyone else follows the board as it happens, can step back through the moves, and can switch on live Stockfish analysis (players don't get it during their own game). Moves stay optional.
+- **Google Chat (optional):** a message in your group's Chat space when a live game starts and when a game is logged.
 - **TV mode:** a full-screen, read-only scoreboard for a big screen at the venue, with the live boards, the ratings and the latest results.
 - **Installable app:** add it to the home screen of a phone or tablet and it opens full screen, without the browser bar. The screen stays on during a live game.
 - **Your own data:** download everything stored about you, or delete your account (your games stay, under "Slettet spiller", because they're part of your opponents' ratings).
 - **The game page:** replay the moves on a board (buttons, arrow keys or tap a move) with move statistics, see each side's expected score before the game, upsets and the head-to-head, give kudos and comment, with replies and likes.
-- **Engine analysis, if you record the moves:** Stockfish 18 runs in your own browser and marks blunders, mistakes and inaccuracies ("5. Nxf7? cost 3.3 pawns. Better was 5. Bxf7+"), with an evaluation graph, the engine's move as an arrow and an accuracy per player. Press **Analyse** under the board and one Stockfish reviews the game, then shows the three best lines in every position, and you can try your own moves on the board: what if you'd played something else? Recording moves is always optional.
+- **Engine analysis, if you record the moves:** Stockfish 18 runs in your own browser and marks blunders, mistakes and inaccuracies ("5. Nxf7? cost 3.3 pawns. Better was 5. Bxf7+"), with an evaluation graph, the engine's move as an arrow, an accuracy per player and a rough "played like ≈1450" rating for the game. Press **Analyse** under the board and one Stockfish reviews the game, then shows the three best lines in every position, and you can try your own moves on the board: what if you'd played something else? Recording moves is always optional.
 - **Year in review ("Årets sjakk"):** Wrapped-style story cards for every player (games, best month, biggest upset, arch rival, winning streak, favourite opening, rating) and for the group (game of the year, giant killer, rivalry of the year…). Each card can be shared as an image. The home page invites everyone in December and January.
 - **Player of the month:** a monthly award for whoever beat their rating's expectations the most (so the underdog can win, not just the strongest), plus one for the most active player. Winners get a badge on their profile, and the home page shows this month's race.
 - **Opponent confirmation.** A result counts once the other player confirms it, or automatically after 48 hours. Disputes go to an admin.
@@ -78,7 +79,7 @@ Full instructions: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**
 
 ## Secrets
 
-This repository contains **no secrets**. Production values (`JWT_SECRET`, database credentials, the one-time `BOOTSTRAP_INVITE_CODE`) live only in the hosting provider's environment settings. `.env*` files are git-ignored, `*.env.example` files show what's needed, and CI runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push. See [SECURITY.md](docs/SECURITY.md#secrets-inventory).
+This repository contains **no secrets**. Production values (`JWT_SECRET`, database credentials, the one-time `BOOTSTRAP_INVITE_CODE`, the optional Google Chat webhook link) live only in the hosting provider's environment settings. `.env*` files are git-ignored, `*.env.example` files show what's needed, and CI runs [gitleaks](https://github.com/gitleaks/gitleaks) on every push. See [SECURITY.md](docs/SECURITY.md#secrets-inventory).
 
 ## Project structure
 

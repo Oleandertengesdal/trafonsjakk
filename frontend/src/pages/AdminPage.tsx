@@ -1,6 +1,6 @@
 import { Link } from 'react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { RefreshCw, ShieldCheck } from 'lucide-react'
+import { MessageSquare, RefreshCw, ShieldCheck } from 'lucide-react'
 import { adminApi } from '../api/endpoints'
 import { invalidateResults, queryClient } from '../api/queryClient'
 import type { Game, Role } from '../api/types'
@@ -145,7 +145,42 @@ export function AdminPage() {
           </div>
         )}
       </Panel>
+
+      <ChatPanel />
     </div>
+  )
+}
+
+/** Google Chat: on or off (the webhook link is set on the server, never shown here), and a test message. */
+function ChatPanel() {
+  const a = useI18n().t.admin
+  const errorText = useErrorText()
+  const toast = useToast()
+  const status = useQuery({ queryKey: ['adminChat'], queryFn: adminApi.chat })
+  const test = useMutation({
+    mutationFn: adminApi.chatTest,
+    onSuccess: () => toast(a.chatSent),
+    onError: (e) => toast(errorText(e), 'error'),
+  })
+  return (
+    <Panel title={a.chat}>
+      <div className="flex flex-col items-start gap-3 px-5 pt-1 pb-5">
+        {status.isPending ? (
+          <SkeletonRows rows={1} />
+        ) : status.isError ? (
+          <ErrorNotice error={status.error} onRetry={() => status.refetch()} />
+        ) : status.data.configured ? (
+          <>
+            <p className="text-[0.9375rem] text-muted">{a.chatOn}</p>
+            <Button variant="secondary" size="sm" onClick={() => test.mutate()} loading={test.isPending}>
+              <MessageSquare aria-hidden className="size-4" /> {a.chatTest}
+            </Button>
+          </>
+        ) : (
+          <p className="text-[0.9375rem] text-muted">{a.chatOff}</p>
+        )}
+      </div>
+    </Panel>
   )
 }
 

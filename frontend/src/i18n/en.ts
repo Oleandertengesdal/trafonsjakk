@@ -625,6 +625,12 @@ export const en = {
     resetReplaces: 'Making a new link cancels any earlier one.',
     copyLink: 'Copy link',
     done: 'Done',
+    chat: 'Google Chat',
+    chatOn: 'A message goes to your Google Chat space when a live game starts and when a game is logged.',
+    chatOff:
+      'Not set up. To get messages in a Google Chat space, put the space’s webhook link in GOOGLE_CHAT_WEBHOOK_URL on the server (see docs/DEPLOYMENT.md).',
+    chatTest: 'Send a test message',
+    chatSent: 'Test message sent. Check the space.',
   },
 
   reset: {
@@ -739,6 +745,9 @@ export const en = {
     player: 'Player',
     marks: 'Blunders, mistakes and inaccuracies',
     clean: 'No mistakes',
+    playedLike: 'Played like',
+    playedLikeNote:
+      'The ≈ number under the accuracy is a rough rating: how strong the play in this one game looked. One game can be several hundred points off, so it says more about the game than about the player.',
     judgement: { blunder: 'Blunder', mistake: 'Mistake', inaccuracy: 'Inaccuracy' },
     cost: (pawns: string, one: boolean) => `cost ${pawns} ${one ? 'pawn' : 'pawns'}`,
     allowedMate: (n: number) => `allowed mate in ${n}`,
@@ -918,6 +927,8 @@ export const en = {
       'live.already_playing': 'One of the players is already in a live game.',
       'live.out_of_date': 'Someone else saved moves in the meantime.',
       'live.not_running': 'This game has already ended.',
+      'chat.not_configured': 'Google Chat isn’t set up on the server.',
+      'chat.failed': 'Google Chat didn’t accept the message. Check that the webhook link is still valid.',
       'live.not_found': 'That live game doesn’t exist.',
       'user.not_found': 'User not found.',
       'player.not_found': 'Player not found.',

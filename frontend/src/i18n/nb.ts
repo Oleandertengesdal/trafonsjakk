@@ -620,6 +620,12 @@ export const nb: Dict = {
     resetReplaces: 'En ny lenke gjør eventuelle tidligere lenker ugyldige.',
     copyLink: 'Kopier lenken',
     done: 'Ferdig',
+    chat: 'Google Chat',
+    chatOn: 'Det kommer en melding i Google Chat-rommet deres når et parti starter direkte og når et parti blir registrert.',
+    chatOff:
+      'Ikke satt opp. For å få meldinger i et Google Chat-rom, legg rommets webhook-lenke i GOOGLE_CHAT_WEBHOOK_URL på serveren (se docs/DEPLOYMENT.md).',
+    chatTest: 'Send en testmelding',
+    chatSent: 'Testmeldingen er sendt. Sjekk rommet.',
   },
 
   reset: {
@@ -734,6 +740,9 @@ export const nb: Dict = {
     player: 'Spiller',
     marks: 'Tabber, feil og unøyaktigheter',
     clean: 'Ingen feil',
+    playedLike: 'Spilte som',
+    playedLikeNote:
+      'Tallet med ≈ under nøyaktigheten er en grov rating: hvor sterkt spillet i akkurat dette partiet var. Ett parti kan bomme med flere hundre poeng, så det sier mer om partiet enn om spilleren.',
     judgement: { blunder: 'Tabbe', mistake: 'Feil', inaccuracy: 'Unøyaktighet' },
     cost: (pawns, one) => `kostet ${pawns} ${one ? 'bonde' : 'bønder'}`,
     allowedMate: (n) => `ga motstanderen matt i ${n}`,
@@ -913,6 +922,8 @@ export const nb: Dict = {
       'live.already_playing': 'En av spillerne er allerede i et direkteparti.',
       'live.out_of_date': 'Noen andre lagret trekk i mellomtiden.',
       'live.not_running': 'Dette partiet er allerede ferdig.',
+      'chat.not_configured': 'Google Chat er ikke satt opp på serveren.',
+      'chat.failed': 'Google Chat tok ikke imot meldingen. Sjekk at webhook-lenken fortsatt gjelder.',
       'live.not_found': 'Det direktepartiet finnes ikke.',
       'user.not_found': 'Fant ikke brukeren.',
       'player.not_found': 'Fant ikke spilleren.',

@@ -31,6 +31,8 @@ const YearPage = lazy(() => import('./pages/YearPage').then((m) => ({ default: m
 const LivePage = lazy(() => import('./pages/LivePage').then((m) => ({ default: m.LivePage })))
 const LiveGamePage = lazy(() => import('./pages/LiveGamePage').then((m) => ({ default: m.LiveGamePage })))
 const TvPage = lazy(() => import('./pages/TvPage').then((m) => ({ default: m.TvPage })))
+const RivalryPage = lazy(() => import('./pages/RivalryPage').then((m) => ({ default: m.RivalryPage })))
+const OpeningsPage = lazy(() => import('./pages/OpeningsPage').then((m) => ({ default: m.OpeningsPage })))
 const GameDetailPage = lazy(() => import('./pages/GameDetailPage').then((m) => ({ default: m.GameDetailPage })))
 
 const page = (node: ReactNode) => <Suspense fallback={<Skeleton className="h-96 w-full rounded-panel" />}>{node}</Suspense>
@@ -72,6 +74,8 @@ export function App() {
                     <Route path="live" element={page(<LivePage />)} />
                     <Route path="live/:id" element={page(<LiveGamePage />)} />
                     <Route path="leaderboard" element={<LeaderboardPage />} />
+                    <Route path="openings" element={page(<OpeningsPage />)} />
+                    <Route path="rivalry/:a/:b" element={page(<RivalryPage />)} />
                     <Route path="players/:username" element={page(<ProfilePage />)} />
                     <Route path="year/:year" element={page(<YearPage />)} />
                     <Route path="year/:year/:username" element={page(<YearPage />)} />

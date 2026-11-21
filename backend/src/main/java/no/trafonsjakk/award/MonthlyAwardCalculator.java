@@ -20,6 +20,10 @@ import java.util.Map;
  * Ties go to more games, then the bigger rating gain, then the older account.
  * <p>
  * <b>Most active</b> played the most games (at least {@code minGames}); ties go to the better performance.
+ * <p>
+ * <b>Most accurate</b> has the highest average accuracy over the month's analysed games (the engine review
+ * saved on the server), counting games with at least 10 of their own moves; at least {@code minGames} such
+ * games. Ties go to more games, then the older account.
  */
 public final class MonthlyAwardCalculator {
 
@@ -45,7 +49,36 @@ public final class MonthlyAwardCalculator {
     public record Result(List<Standing> playerOfMonth, Long playerOfMonthWinner, List<Standing> mostActive, Long mostActiveWinner) {
     }
 
+    /** One player's accuracy in one analysed game. */
+    public record AccuracyRow(long userId, double accuracy) {
+    }
+
+    public record AccuracyStanding(long userId, int games, double accuracy, boolean qualified) {
+    }
+
+    public record AccuracyResult(List<AccuracyStanding> standings, Long winner) {
+    }
+
     private MonthlyAwardCalculator() {
+    }
+
+    public static AccuracyResult mostAccurate(List<AccuracyRow> rows, int minGames) {
+        Map<Long, double[]> acc = new HashMap<>();
+        for (AccuracyRow r : rows) {
+            double[] a = acc.computeIfAbsent(r.userId(), k -> new double[2]);
+            a[0]++;
+            a[1] += r.accuracy();
+        }
+        List<AccuracyStanding> standings = acc.entrySet().stream()
+                .map(e -> new AccuracyStanding(e.getKey(), (int) e.getValue()[0], e.getValue()[1] / e.getValue()[0],
+                        e.getValue()[0] >= minGames))
+                .sorted(Comparator.comparing(AccuracyStanding::qualified).reversed()
+                        .thenComparing(s -> -rounded(s.accuracy()))
+                        .thenComparing(s -> -s.games())
+                        .thenComparing(AccuracyStanding::userId))
+                .toList();
+        Long winner = !standings.isEmpty() && standings.getFirst().qualified() ? standings.getFirst().userId() : null;
+        return new AccuracyResult(standings, winner);
     }
 
     public static Result compute(List<GameRow> games, int minGames) {

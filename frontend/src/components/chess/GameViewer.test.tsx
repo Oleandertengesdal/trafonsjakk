@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,9 +12,11 @@ const MOVES = '1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. O-O'
 function setup(moves = MOVES) {
   localStorage.setItem('tf-lang', 'en')
   const utils = render(
-    <I18nProvider>
-      <GameViewer moves={moves} orientation="white" whiteName="Kari" blackName="Ola" />
-    </I18nProvider>,
+    <QueryClientProvider client={new QueryClient()}>
+      <I18nProvider>
+        <GameViewer moves={moves} orientation="white" whiteName="Kari" blackName="Ola" />
+      </I18nProvider>
+    </QueryClientProvider>,
   )
   const status = () => screen.getByTestId('viewer-status').textContent
   const current = () => screen.getByRole('list', { name: en.moves.list }).querySelector('[aria-current="true"]')?.textContent

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -86,7 +87,8 @@ public class TournamentService {
                 continue;
             }
             Tournament t = m.getTournament();
-            int total = totalRounds.computeIfAbsent(t.getId(), matches::maxRound);
+            int total = t.getFormat() == TournamentFormat.SWISS && t.getSwissRounds() != null ? t.getSwissRounds()
+                    : totalRounds.computeIfAbsent(t.getId(), matches::maxRound);
             List<Game> played = games.findByMatchId(m.getId());
             boolean replay = needsReplay(t, m, played);
             // A drawn knockout game is replayed with the colours of the last game reversed
@@ -114,7 +116,11 @@ public class TournamentService {
         }
         boolean doubleRr = req.format() == TournamentFormat.ROUND_ROBIN && req.isDouble();
         User creator = users.findById(actor.id()).orElseThrow(() -> ApiException.unauthorized("auth.not_logged_in", "Not logged in"));
-        Tournament t = tournaments.save(new Tournament(name, req.format(), doubleRr, creator));
+        Tournament t = new Tournament(name, req.format(), doubleRr, creator);
+        if (req.format() == TournamentFormat.SWISS) {
+            t.setSwissRounds(req.rounds());
+        }
+        t = tournaments.save(t);
         for (User u : validPlayers(req.participantIds())) {
             participants.save(new TournamentParticipant(t, u));
         }
@@ -184,7 +190,7 @@ public class TournamentService {
 
         List<TournamentParticipant> ps = new ArrayList<>(participants.findByTournamentId(id));
         int n = ps.size();
-        int min = t.getFormat() == TournamentFormat.ROUND_ROBIN ? 3 : 2;
+        int min = t.getFormat() == TournamentFormat.SINGLE_ELIMINATION ? 2 : 3;
         if (n < min) {
             throw ApiException.conflict("tournament.min_players", "Need at least " + min + " players to start").with("min", min);
         }
@@ -205,6 +211,10 @@ public class TournamentService {
                 matches.save(new TournamentMatch(t, p.round(), p.board(), byId.get(p.white()), byId.get(p.black()),
                         MatchStatus.READY));
             }
+        } else if (t.getFormat() == TournamentFormat.SWISS) {
+            int requested = t.getSwissRounds() == null ? SwissPairing.defaultRounds(n) : t.getSwissRounds();
+            t.setSwissRounds(Math.max(1, Math.min(requested, SwissPairing.maxRounds(n))));
+            pairNextSwissRound(t, List.of());
         } else {
             generateBracket(t, seeded, byId);
         }
@@ -287,13 +297,17 @@ public class TournamentService {
                 .filter(g -> g.getStatus() == GameStatus.CONFIRMED)
                 .toList();
 
-        if (t.getFormat() == TournamentFormat.ROUND_ROBIN) {
+        if (t.getFormat() == TournamentFormat.ROUND_ROBIN || t.getFormat() == TournamentFormat.SWISS) {
             Game first = confirmed.isEmpty() ? null : confirmed.getFirst();
             m.setResult(first == null ? null : resultForMatch(first, m));
             m.setWinner(first == null ? null : first.winner());
             m.setStatus(first == null ? MatchStatus.READY : MatchStatus.COMPLETED);
             matches.flush();
-            updateRoundRobinCompletion(t);
+            if (t.getFormat() == TournamentFormat.SWISS) {
+                updateSwiss(t);
+            } else {
+                updateRoundRobinCompletion(t);
+            }
             return;
         }
 
@@ -337,6 +351,106 @@ public class TournamentService {
         m.setStatus(newWinner != null ? MatchStatus.COMPLETED : MatchStatus.READY);
     }
 
+    /**
+     * Swiss: when every game of the latest round has a result, pair the next one, or finish the tournament
+     * after the last (or when no pairing without a rematch is left). A result taken back reopens it.
+     */
+    private void updateSwiss(Tournament t) {
+        List<TournamentMatch> all = matches.findByTournamentId(t.getId());
+        int latest = all.stream().mapToInt(TournamentMatch::getRoundNumber).max().orElse(0);
+        boolean latestDone = all.stream().filter(x -> x.getRoundNumber() == latest)
+                .allMatch(x -> x.getStatus() == MatchStatus.COMPLETED || x.getStatus() == MatchStatus.BYE);
+        boolean allDone = all.stream().allMatch(x -> x.getStatus() == MatchStatus.COMPLETED || x.getStatus() == MatchStatus.BYE);
+        if (!allDone) {
+            if (t.getStatus() == TournamentStatus.COMPLETED) {
+                t.reopen();
+            }
+            return;
+        }
+        if (latestDone && latest < t.getSwissRounds() && t.getStatus() == TournamentStatus.IN_PROGRESS && pairNextSwissRound(t, all)) {
+            return;
+        }
+        if (t.getStatus() == TournamentStatus.IN_PROGRESS) {
+            List<SwissStandings.Standing> table = swissStandings(t, all);
+            t.complete(table.isEmpty() ? null : users.getReferenceById(table.getFirst().playerId()), Instant.now());
+        }
+    }
+
+    /** Pairs the next Swiss round from the results so far; false if no pairing without a rematch exists. */
+    private boolean pairNextSwissRound(Tournament t, List<TournamentMatch> sofar) {
+        List<TournamentParticipant> ps = participants.findByTournamentId(t.getId());
+        Map<Long, Integer> seeds = new HashMap<>();
+        Map<Long, User> byId = new HashMap<>();
+        for (TournamentParticipant p : ps) {
+            seeds.put(p.getUser().getId(), p.getSeed() == null ? Integer.MAX_VALUE : p.getSeed());
+            byId.put(p.getUser().getId(), p.getUser());
+        }
+        Map<Long, Double> scores = new HashMap<>();
+        swissStandings(t, sofar).forEach(s -> scores.put(s.playerId(), s.points()));
+        List<SwissPairing.Player> players = new ArrayList<>();
+        for (Long id : seeds.keySet()) {
+            Set<Long> played = new HashSet<>();
+            int whites = 0;
+            int blacks = 0;
+            Boolean lastWhite = null;
+            int lastRound = 0;
+            boolean hadBye = false;
+            for (TournamentMatch m : sofar) {
+                if (m.getStatus() == MatchStatus.BYE) {
+                    hadBye |= m.getWhite() != null && m.getWhite().getId().equals(id);
+                    continue;
+                }
+                boolean white = m.getWhite() != null && m.getWhite().getId().equals(id);
+                boolean black = m.getBlack() != null && m.getBlack().getId().equals(id);
+                if (!white && !black) {
+                    continue;
+                }
+                played.add(white ? m.getBlack().getId() : m.getWhite().getId());
+                if (white) {
+                    whites++;
+                } else {
+                    blacks++;
+                }
+                if (m.getRoundNumber() > lastRound) {
+                    lastRound = m.getRoundNumber();
+                    lastWhite = white;
+                }
+            }
+            players.add(new SwissPairing.Player(id, scores.getOrDefault(id, 0.0), seeds.get(id), played, whites, blacks,
+                    lastWhite, hadBye));
+        }
+        SwissPairing.Round round = SwissPairing.pair(players);
+        if (round == null) {
+            return false;
+        }
+        int number = sofar.stream().mapToInt(TournamentMatch::getRoundNumber).max().orElse(0) + 1;
+        for (SwissPairing.Pairing p : round.pairings()) {
+            matches.save(new TournamentMatch(t, number, p.board(), byId.get(p.white()), byId.get(p.black()), MatchStatus.READY));
+        }
+        if (round.bye() != null) {
+            User solo = byId.get(round.bye());
+            TournamentMatch bye = new TournamentMatch(t, number, round.pairings().size(), solo, null, MatchStatus.BYE);
+            bye.setWinner(solo);
+            matches.save(bye);
+        }
+        matches.flush();
+        return true;
+    }
+
+    private List<SwissStandings.Standing> swissStandings(Tournament t, List<TournamentMatch> ms) {
+        Map<Long, Integer> seeds = new HashMap<>();
+        for (TournamentParticipant p : participants.findByTournamentId(t.getId())) {
+            seeds.put(p.getUser().getId(), p.getSeed() == null ? Integer.MAX_VALUE : p.getSeed());
+        }
+        List<StandingsCalculator.Result> results = ms.stream()
+                .filter(m -> m.getStatus() == MatchStatus.COMPLETED && m.getResult() != null)
+                .map(m -> new StandingsCalculator.Result(m.getWhite().getId(), m.getBlack().getId(), m.getResult().whiteScore()))
+                .toList();
+        List<Long> byes = ms.stream().filter(m -> m.getStatus() == MatchStatus.BYE && m.getWhite() != null)
+                .map(m -> m.getWhite().getId()).toList();
+        return SwissStandings.compute(seeds, results, byes);
+    }
+
     private void updateRoundRobinCompletion(Tournament t) {
         List<TournamentMatch> all = matches.findByTournamentId(t.getId());
         boolean done = all.stream().allMatch(x -> x.getStatus() == MatchStatus.COMPLETED);
@@ -373,7 +487,9 @@ public class TournamentService {
                 : games.findActiveByMatchIds(ms.stream().map(TournamentMatch::getId).toList()).stream()
                 .collect(Collectors.groupingBy(g -> g.getMatch().getId()));
 
-        int totalRounds = ms.stream().mapToInt(TournamentMatch::getRoundNumber).max().orElse(0);
+        // Swiss rounds are paired one at a time: the total is the planned number
+        int totalRounds = t.getFormat() == TournamentFormat.SWISS && t.getSwissRounds() != null ? t.getSwissRounds()
+                : ms.stream().mapToInt(TournamentMatch::getRoundNumber).max().orElse(0);
         TreeMap<Integer, List<MatchDto>> byRound = new TreeMap<>();
         Integer currentRound = null;
         int completed = 0;
@@ -395,12 +511,17 @@ public class TournamentService {
         byRound.forEach((r, list) -> rounds.add(new RoundDto(r, roundName(t, r, totalRounds), list)));
 
         List<StandingDto> standingDtos = null;
+        Map<Long, User> people = ps.stream().map(TournamentParticipant::getUser)
+                .collect(Collectors.toMap(User::getId, Function.identity()));
         if (t.getFormat() == TournamentFormat.ROUND_ROBIN && !ms.isEmpty()) {
-            Map<Long, User> byId = ps.stream().map(TournamentParticipant::getUser)
-                    .collect(Collectors.toMap(User::getId, Function.identity()));
             standingDtos = standings(t, ms).stream()
-                    .map(s -> new StandingDto(s.rank(), PlayerRef.of(byId.get(s.playerId())), s.played(), s.wins(),
-                            s.draws(), s.losses(), s.points(), s.sonnebornBerger()))
+                    .map(s -> new StandingDto(s.rank(), PlayerRef.of(people.get(s.playerId())), s.played(), s.wins(),
+                            s.draws(), s.losses(), s.points(), s.sonnebornBerger(), 0, null))
+                    .toList();
+        } else if (t.getFormat() == TournamentFormat.SWISS && !ms.isEmpty()) {
+            standingDtos = swissStandings(t, ms).stream()
+                    .map(s -> new StandingDto(s.rank(), PlayerRef.of(people.get(s.playerId())), s.played(), s.wins(),
+                            s.draws(), s.losses(), s.points(), s.sonnebornBerger(), s.byes(), s.buchholz()))
                     .toList();
         }
 
@@ -452,7 +573,7 @@ public class TournamentService {
     }
 
     private TournamentSummary summary(Tournament t, int participantCount) {
-        return new TournamentSummary(t.getId(), t.getName(), t.getFormat(), t.getStatus(), t.isDoubleRoundRobin(),
+        return new TournamentSummary(t.getId(), t.getName(), t.getFormat(), t.getStatus(), t.isDoubleRoundRobin(), t.getSwissRounds(),
                 participantCount, PlayerRef.of(t.getCreatedBy()), PlayerRef.of(t.getWinner()), t.getCreatedAt(),
                 t.getStartedAt(), t.getCompletedAt());
     }

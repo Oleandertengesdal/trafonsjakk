@@ -38,6 +38,10 @@ public class Tournament {
     @Column(name = "double_round_robin", nullable = false)
     private boolean doubleRoundRobin;
 
+    /** Swiss only: how many rounds (set at the start; the rounds are paired one at a time). */
+    @Column(name = "swiss_rounds")
+    private Integer swissRounds;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
@@ -110,6 +114,14 @@ public class Tournament {
 
     public TournamentStatus getStatus() {
         return status;
+    }
+
+    public Integer getSwissRounds() {
+        return swissRounds;
+    }
+
+    public void setSwissRounds(Integer swissRounds) {
+        this.swissRounds = swissRounds;
     }
 
     public boolean isDoubleRoundRobin() {

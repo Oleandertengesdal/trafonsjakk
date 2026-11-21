@@ -131,6 +131,14 @@ function ContextBody({ game, ctx }: { game: Game; ctx: GameContext }) {
             </ul>
           </>
         )}
+        {h.games > 0 && (
+          <Link
+            to={`/rivalry/${encodeURIComponent(game.white.username)}/${encodeURIComponent(game.black.username)}`}
+            className="mt-3 inline-block text-[0.9375rem] font-medium text-accent hover:underline"
+          >
+            {c.rivalryLink}
+          </Link>
+        )}
       </section>
     </div>
   )

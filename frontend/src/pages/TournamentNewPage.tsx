@@ -32,6 +32,7 @@ export function TournamentNewPage() {
   const [name, setName] = useState('')
   const [format, setFormat] = useState<TournamentFormat>('ROUND_ROBIN')
   const [double, setDouble] = useState(false)
+  const [swissRounds, setSwissRounds] = useState<number | null>(null)
   const [selected, setSelected] = useState<Set<number>>(() => new Set([me!.id]))
   const [nameError, setNameError] = useState<string | undefined>()
 
@@ -45,11 +46,17 @@ export function TournamentNewPage() {
     onError: (e) => toast(errorText(e), 'error'),
   })
 
-  const min = format === 'ROUND_ROBIN' ? 3 : 2
+  const min = format === 'SINGLE_ELIMINATION' ? 2 : 3
   const n = selected.size
   const isDouble = format === 'ROUND_ROBIN' && double
-  const rounds = format === 'ROUND_ROBIN' ? (n % 2 ? n : n - 1) * (isDouble ? 2 : 1) : Math.ceil(Math.log2(Math.max(n, 2)))
-  const gameCount = format === 'ROUND_ROBIN' ? ((n * (n - 1)) / 2) * (isDouble ? 2 : 1) : Math.max(n - 1, 0)
+  // Swiss: log2 of the players plus one by default, at most players − 1 and 15 (as on the server)
+  const swissMax = Math.max(1, Math.min(n - 1, 15))
+  const swissDefault = Math.max(1, Math.min(Math.ceil(Math.log2(Math.max(n, 2))) + 1, swissMax))
+  const swiss = Math.min(swissRounds ?? swissDefault, swissMax)
+  const rounds =
+    format === 'ROUND_ROBIN' ? (n % 2 ? n : n - 1) * (isDouble ? 2 : 1) : format === 'SWISS' ? swiss : Math.ceil(Math.log2(Math.max(n, 2)))
+  const gameCount =
+    format === 'ROUND_ROBIN' ? ((n * (n - 1)) / 2) * (isDouble ? 2 : 1) : format === 'SWISS' ? Math.floor(n / 2) * swiss : Math.max(n - 1, 0)
 
   function toggle(id: number) {
     setSelected((cur) => {
@@ -67,7 +74,13 @@ export function TournamentNewPage() {
       return
     }
     setNameError(undefined)
-    create.mutate({ name: name.trim(), format, doubleRoundRobin: isDouble, participantIds: [...selected] })
+    create.mutate({
+      name: name.trim(),
+      format,
+      doubleRoundRobin: isDouble,
+      participantIds: [...selected],
+      rounds: format === 'SWISS' && swissRounds !== null ? swiss : undefined,
+    })
   }
 
   return (
@@ -85,8 +98,28 @@ export function TournamentNewPage() {
             options={[
               { value: 'ROUND_ROBIN', label: t.format.ROUND_ROBIN, hint: tn.roundRobinHint },
               { value: 'SINGLE_ELIMINATION', label: t.format.SINGLE_ELIMINATION, hint: tn.knockoutHint },
+              { value: 'SWISS', label: t.format.SWISS, hint: tn.swissHint },
             ]}
           />
+          {format === 'SWISS' && (
+            <Field label={tn.rounds} hint={tn.roundsHint(swissDefault)}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={swissMax}
+                  className="w-28"
+                  value={swiss}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    setSwissRounds(Number.isInteger(v) && v >= 1 ? Math.min(v, 15) : null)
+                  }}
+                />
+              )}
+            </Field>
+          )}
           {format === 'ROUND_ROBIN' && (
             <label className="flex items-start gap-2.5 text-[0.9375rem]">
               <input type="checkbox" checked={double} onChange={(e) => setDouble(e.target.checked)} className="mt-1 size-4 accent-[var(--c-brand)]" />

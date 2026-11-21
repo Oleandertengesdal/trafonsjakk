@@ -15,11 +15,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class AwardRepository {
 
-    public enum Kind { PLAYER_OF_MONTH, MOST_ACTIVE }
+    public enum Kind { PLAYER_OF_MONTH, MOST_ACTIVE, MOST_ACCURATE }
 
-    /** {@code userId} is null when the month was decided but nobody qualified. */
+    /**
+     * {@code userId} is null when the month was decided but nobody qualified. {@code accuracy} is only set for
+     * MOST_ACCURATE (the average over the month's analysed games; {@code games} counts those).
+     */
     public record Row(YearMonth month, Kind kind, Long userId, int games, double points, double expected,
-                      double ratingChange, Instant decidedAt) {
+                      double ratingChange, Double accuracy, Instant decidedAt) {
     }
 
     private static final RowMapper<Row> MAPPER = (rs, i) -> new Row(
@@ -30,9 +33,10 @@ public class AwardRepository {
             rs.getDouble("points"),
             rs.getDouble("expected"),
             rs.getDouble("rating_change"),
+            (Double) rs.getObject("accuracy", Double.class),
             rs.getTimestamp("decided_at").toInstant());
 
-    private static final String ORDER = " order by month desc, case kind when 'PLAYER_OF_MONTH' then 0 else 1 end";
+    private static final String ORDER = " order by month desc, case kind when 'PLAYER_OF_MONTH' then 0 when 'MOST_ACTIVE' then 1 else 2 end";
 
     private final JdbcTemplate jdbc;
 
@@ -46,10 +50,10 @@ public class AwardRepository {
     }
 
     public void insert(YearMonth month, Kind kind, Long userId, int games, double points, double expected,
-                       double ratingChange, Instant decidedAt) {
-        jdbc.update("insert into monthly_awards (month, kind, user_id, games, points, expected, rating_change, decided_at) "
-                        + "values (?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing",
-                month.atDay(1), kind.name(), userId, games, points, expected, ratingChange, Timestamp.from(decidedAt));
+                       double ratingChange, Double accuracy, Instant decidedAt) {
+        jdbc.update("insert into monthly_awards (month, kind, user_id, games, points, expected, rating_change, accuracy, decided_at) "
+                        + "values (?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing",
+                month.atDay(1), kind.name(), userId, games, points, expected, ratingChange, accuracy, Timestamp.from(decidedAt));
     }
 
     public List<Row> forMonth(YearMonth month) {

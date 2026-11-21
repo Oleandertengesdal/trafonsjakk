@@ -5,6 +5,7 @@ import { usersApi } from '../api/endpoints'
 import { invalidateResults } from '../api/queryClient'
 import { useAuth } from '../auth/AuthProvider'
 import { PageHeader } from '../components/layout/PageHeader'
+import { NotificationsPanel } from '../components/settings/NotificationsPanel'
 import { Button } from '../components/ui/Button'
 import { Dialog } from '../components/ui/Dialog'
 import { Field, Input } from '../components/ui/Field'
@@ -113,6 +114,8 @@ export function SettingsPage() {
           </div>
         </form>
       </Panel>
+
+      <NotificationsPanel />
 
       <Panel title={t.language.label}>
         <div className="px-5 pt-2 pb-5">

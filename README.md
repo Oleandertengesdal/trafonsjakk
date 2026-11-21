@@ -11,6 +11,9 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 - **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
 - **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
 - **Live games:** start a game when you sit down, record each move on a phone as you play (saved straight away), and tap the result at the end. Everyone else follows the board as it happens, can step back through the moves, and can switch on live Stockfish analysis (players don't get it during their own game). Moves stay optional.
+- **Push notifications (optional):** turn them on per device and get a notification when someone logs a game against you, so you can confirm it.
+- **Rivalry pages:** two players against each other: the score, streaks, the biggest upset, both ratings on one chart, their best-played games and every game between them. Open one from a profile's head-to-head table or a game page.
+- **Opening explorer:** which openings the group plays and how they score, for everyone or one player (as White or Black). Follow the moves on a board, see the games behind each line, and the most played openings by name.
 - **Google Chat (optional):** a message in your group's Chat space when a live game starts and when a game is logged.
 - **TV mode:** a full-screen, read-only scoreboard for a big screen at the venue, with the live boards, the ratings and the latest results.
 - **Installable app:** add it to the home screen of a phone or tablet and it opens full screen, without the browser bar. The screen stays on during a live game.
@@ -24,6 +27,7 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 - **Tournaments**
   - *Round-robin* (single or double): Berger pairings with balanced colours, and a live crosstable with Sonneborn–Berger tie-breaks.
   - *Knockout*: seeded bracket with byes for top seeds. Winners advance automatically; draws are replayed with colours reversed.
+  - *Swiss* (monrad): for when there are too many players for everyone to meet. A set number of rounds, each paired when the previous one is finished, against players on the same score and never the same opponent twice. Buchholz and Sonneborn–Berger tie-breaks.
 - **Player statistics:** rating graph, W/D/L, white vs black, streaks, head-to-head against every friend, nemesis, best win, favourite opening, activity.
 - **Invite-only sign-up.** Members make single-use codes; admins can make one code for a whole group, with their own limit and expiry.
 - **Admin tools** for disputes and members, including a one-time link for someone who forgot their password.
@@ -92,6 +96,7 @@ docs/        Architecture, API, security, development and deployment guides
 ## Credits
 
 - Move legality: [chess.js](https://github.com/jhlywa/chess.js) (BSD-2-Clause). Board: [react-chessboard](https://github.com/Clariity/react-chessboard) (MIT).
+- Opening names: [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings) (CC0, public domain), built into `frontend/src/chess/openings.json` by `frontend/scripts/build-openings.mjs`.
 - Engine: [Stockfish](https://github.com/official-stockfish/Stockfish) 18 via [Stockfish.js](https://github.com/nmrugg/stockfish.js) 18.0.8 (GPLv3), served unmodified from `frontend/public/engine` with its licence; see the README there.
 - Images of the year-in-review cards: [html-to-image](https://github.com/bubkoo/html-to-image) (MIT).
 - Chess piece graphics by Colin M.L. Burnett, used under the BSD license (via react-chessboard).

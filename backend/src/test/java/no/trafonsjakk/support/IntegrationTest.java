@@ -42,7 +42,7 @@ public abstract class IntegrationTest {
     void cleanDatabase() {
         // Ids restart below, so in-memory counters keyed by user id would otherwise land on someone else
         attempts.forgetAll();
-        jdbc.execute("TRUNCATE live_games, rating_history, games, tournament_matches, tournament_participants, tournaments, "
+        jdbc.execute("TRUNCATE push_subscriptions, game_analyses, live_games, rating_history, games, tournament_matches, tournament_participants, tournaments, "
                 + "monthly_awards, comment_likes, game_comments, game_kudos, password_reset_tokens, invite_redemptions, "
                 + "refresh_tokens, invite_codes, users RESTART IDENTITY CASCADE");
     }

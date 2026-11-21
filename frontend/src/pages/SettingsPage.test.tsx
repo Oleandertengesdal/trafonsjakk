@@ -13,6 +13,7 @@ import { SettingsPage } from './SettingsPage'
 
 vi.mock('../api/endpoints', () => ({
   usersApi: { updateMe: vi.fn(), changePassword: vi.fn(), exportData: vi.fn(), deleteAccount: vi.fn() },
+  pushApi: { key: vi.fn(), status: vi.fn(), subscribe: vi.fn(), unsubscribe: vi.fn(), test: vi.fn() },
 }))
 const auth = vi.hoisted(() => ({ logout: vi.fn() }))
 vi.mock('../auth/AuthProvider', () => ({

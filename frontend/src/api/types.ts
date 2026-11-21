@@ -3,7 +3,7 @@
 export type Role = 'USER' | 'ADMIN'
 export type GameResult = 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW'
 export type GameStatus = 'PENDING' | 'CONFIRMED' | 'DISPUTED' | 'VOIDED'
-export type TournamentFormat = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION'
+export type TournamentFormat = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS'
 export type TournamentStatus = 'REGISTRATION' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type MatchStatus = 'WAITING' | 'READY' | 'COMPLETED' | 'BYE'
 
@@ -196,7 +196,7 @@ export interface GroupYear {
   topRivalry: { a: PlayerRef; b: PlayerRef; games: number; aWins: number; draws: number; bWins: number } | null
 }
 
-export type AwardKind = 'PLAYER_OF_MONTH' | 'MOST_ACTIVE'
+export type AwardKind = 'PLAYER_OF_MONTH' | 'MOST_ACTIVE' | 'MOST_ACCURATE'
 
 /** A decided monthly award. `overExpected` = points − expected (from Glicko-2 before each game). */
 export interface Award {
@@ -209,6 +209,8 @@ export interface Award {
   expected: number
   overExpected: number
   ratingChange: number
+  /** MOST_ACCURATE only: average accuracy over the month's analysed games (`games` counts those). */
+  accuracy: number | null
   decidedAt: string
 }
 
@@ -240,6 +242,61 @@ export interface AwardRace {
   minGames: number
   playerOfMonth: AwardCategory
   mostActive: AwardCategory
+  mostAccurate: AccuracyCategory
+}
+
+export interface AccuracyStanding {
+  player: PlayerRef
+  /** Analysed games with at least 10 of their own moves. */
+  games: number
+  accuracy: number
+  qualified: boolean
+}
+
+export interface AccuracyCategory {
+  winner: Award | null
+  standings: AccuracyStanding[]
+}
+
+/** One position as the engine saw it; the same shape as the website's PositionEval. */
+export interface SavedEval {
+  score: { cp: number } | { mate: number; by: 'w' | 'b' }
+  best: string | null
+}
+
+/** A game's engine analysis, saved by the first browser that reviewed it. Accuracy computed by the server. */
+export interface SavedAnalysis {
+  gameId: number
+  depth: number
+  evals: SavedEval[]
+  white: { moves: number; accuracy: number }
+  black: { moves: number; accuracy: number }
+  analysedAt: string
+}
+
+export interface GameAccuracy {
+  gameId: number
+  accuracy: number
+  colour: 'WHITE' | 'BLACK'
+  result: GameResult
+  opponent: PlayerRef
+  playedAt: string
+}
+
+/** A player's accuracy over their analysed, confirmed games. `recent` is oldest first. */
+export interface PlayerAccuracy {
+  games: number
+  average: number | null
+  best: GameAccuracy | null
+  recent: GameAccuracy[]
+}
+
+/** "Played like" fitted to the group's ratings: rating ≈ intercept + slope × accuracy. Null until enough games. */
+export interface Calibration {
+  samples: number
+  minSamples: number
+  intercept: number | null
+  slope: number | null
 }
 
 export interface LeaderboardRow {
@@ -292,6 +349,8 @@ export interface TournamentSummary {
   format: TournamentFormat
   status: TournamentStatus
   doubleRoundRobin: boolean
+  /** Swiss: the planned number of rounds (requested at creation, settled when it starts). */
+  swissRounds: number | null
   participantCount: number
   createdBy: PlayerRef
   winner: PlayerRef | null
@@ -332,6 +391,9 @@ export interface Standing {
   losses: number
   points: number
   sonnebornBerger: number
+  /** Swiss: rounds sat out (each worth a point) and the Buchholz tie-break; 0 and null otherwise. */
+  byes: number
+  buchholz: number | null
 }
 
 export interface TournamentDetail {
@@ -407,4 +469,28 @@ export interface LiveGame {
   updatedAt: string
   gameId: number | null
   canRecord: boolean
+}
+
+export interface RivalryRecord {
+  games: number
+  aWins: number
+  draws: number
+  bWins: number
+  aPoints: number
+}
+
+/** Two players against each other, from A's side. Confirmed games only; `games` newest first. */
+export interface Rivalry {
+  a: PlayerRef
+  b: PlayerRef
+  overall: RivalryRecord
+  aAsWhite: RivalryRecord
+  aAsBlack: RivalryRecord
+  currentStreak: { side: 'A' | 'B' | null; length: number }
+  longestStreak: { side: 'A' | 'B' | null; length: number }
+  /** The biggest win against a higher-rated opponent (rating gap before the game). */
+  biggestUpset: { gameId: number; winner: 'A' | 'B'; gap: number; playedAt: string } | null
+  /** Their best-played analysed games against each other. */
+  bestGames: { gameId: number; playedAt: string; aAccuracy: number; bAccuracy: number; average: number }[]
+  games: Game[]
 }

@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import no.trafonsjakk.analysis.AnalysisRepository;
+import no.trafonsjakk.analysis.AnalysisService;
 import no.trafonsjakk.award.AwardRepository.Kind;
 import no.trafonsjakk.award.MonthlyAwardCalculator.GameRow;
 import no.trafonsjakk.award.MonthlyAwardCalculator.Standing;
@@ -50,8 +52,15 @@ public class AwardService {
     static final YearMonth EARLIEST = YearMonth.of(2000, 1);
     static final int STANDINGS = 20;
 
+    /** {@code accuracy} is set for MOST_ACCURATE only. */
     public record Award(String month, Kind kind, PlayerRef player, int games, double points, double expected,
-                        double overExpected, int ratingChange, Instant decidedAt) {
+                        double overExpected, int ratingChange, Double accuracy, Instant decidedAt) {
+    }
+
+    public record AccuracyStandingDto(PlayerRef player, int games, double accuracy, boolean qualified) {
+    }
+
+    public record AccuracyCategory(Award winner, List<AccuracyStandingDto> standings) {
     }
 
     public record StandingDto(PlayerRef player, int games, int wins, int draws, int losses, double points,
@@ -63,20 +72,23 @@ public class AwardService {
     }
 
     public record Race(String month, Status status, Instant endsAt, Instant decidesAt, int minGames,
-                       Category playerOfMonth, Category mostActive) {
+                       Category playerOfMonth, Category mostActive, AccuracyCategory mostAccurate) {
     }
 
     private final GameRepository games;
     private final RatingHistoryRepository history;
     private final UserRepository users;
     private final AwardRepository awards;
+    private final AnalysisRepository analyses;
     private final ZoneId zone;
     private final Duration decideAfter;
     private final int minGames;
     private final TransactionTemplate tx;
 
     public AwardService(GameRepository games, RatingHistoryRepository history, UserRepository users,
-                        AwardRepository awards, AppProperties props, PlatformTransactionManager transactionManager) {
+                        AwardRepository awards, AnalysisRepository analyses, AppProperties props,
+                        PlatformTransactionManager transactionManager) {
+        this.analyses = analyses;
         this.tx = new TransactionTemplate(transactionManager);
         this.games = games;
         this.history = history;
@@ -138,15 +150,20 @@ public class AwardService {
         MonthlyAwardCalculator.Result r = MonthlyAwardCalculator.compute(rows(month), minGames);
         store(month, Kind.PLAYER_OF_MONTH, r.playerOfMonthWinner(), r.playerOfMonth(), now);
         store(month, Kind.MOST_ACTIVE, r.mostActiveWinner(), r.mostActive(), now);
-        log.info("Decided awards for {}: player of the month {}, most active {}", month, r.playerOfMonthWinner(), r.mostActiveWinner());
+        MonthlyAwardCalculator.AccuracyResult accurate = MonthlyAwardCalculator.mostAccurate(accuracyRows(month), minGames);
+        MonthlyAwardCalculator.AccuracyStanding best = accurate.winner() == null ? null : accurate.standings().getFirst();
+        awards.insert(month, Kind.MOST_ACCURATE, best == null ? null : best.userId(), best == null ? 0 : best.games(),
+                0, 0, 0, best == null ? null : best.accuracy(), now);
+        log.info("Decided awards for {}: player of the month {}, most active {}, most accurate {}", month,
+                r.playerOfMonthWinner(), r.mostActiveWinner(), accurate.winner());
     }
 
     private void store(YearMonth month, Kind kind, Long winner, List<Standing> standings, Instant now) {
         Standing s = winner == null ? null : standings.stream().filter(x -> x.userId() == winner).findFirst().orElseThrow();
         if (s == null) {
-            awards.insert(month, kind, null, 0, 0, 0, 0, now);
+            awards.insert(month, kind, null, 0, 0, 0, 0, null, now);
         } else {
-            awards.insert(month, kind, s.userId(), s.games(), s.points(), s.expected(), s.ratingChange(), now);
+            awards.insert(month, kind, s.userId(), s.games(), s.points(), s.expected(), s.ratingChange(), null, now);
         }
     }
 
@@ -158,7 +175,10 @@ public class AwardService {
         YearMonth month = monthParam == null || monthParam.isBlank() ? current : parse(monthParam, current);
 
         MonthlyAwardCalculator.Result r = MonthlyAwardCalculator.compute(rows(month), minGames);
-        Map<Long, User> people = usersById(r.playerOfMonth().stream().map(Standing::userId).toList());
+        MonthlyAwardCalculator.AccuracyResult accurate = MonthlyAwardCalculator.mostAccurate(accuracyRows(month), minGames);
+        List<Long> ids = new ArrayList<>(r.playerOfMonth().stream().map(Standing::userId).toList());
+        accurate.standings().forEach(s -> ids.add(s.userId()));
+        Map<Long, User> people = usersById(ids);
         Map<Kind, Award> winners = new HashMap<>();
         Status status = MonthlyAwardCalculator.status(month, now, zone, decideAfter);
         if (status == Status.DECIDED) {
@@ -173,7 +193,10 @@ public class AwardService {
         Instant ends = MonthlyAwardCalculator.endsAt(month, zone);
         return new Race(month.toString(), status, ends, ends.plus(decideAfter), minGames,
                 new Category(winners.get(Kind.PLAYER_OF_MONTH), standings(r.playerOfMonth(), people)),
-                new Category(winners.get(Kind.MOST_ACTIVE), standings(r.mostActive(), people)));
+                new Category(winners.get(Kind.MOST_ACTIVE), standings(r.mostActive(), people)),
+                new AccuracyCategory(winners.get(Kind.MOST_ACCURATE), accurate.standings().stream().limit(STANDINGS)
+                        .map(s -> new AccuracyStandingDto(PlayerRef.of(people.get(s.userId())), s.games(), s.accuracy(), s.qualified()))
+                        .toList()));
     }
 
     /** Awards that were won, newest first; only one person's when {@code username} is given. */
@@ -207,6 +230,21 @@ public class AwardService {
 
     private static ApiException badMonth() {
         return ApiException.badRequest("award.bad_month", "Month must be YYYY-MM, from 2000 up to this month");
+    }
+
+    /** Each player's accuracy in the month's analysed, confirmed games where they made enough moves. */
+    private List<MonthlyAwardCalculator.AccuracyRow> accuracyRows(YearMonth month) {
+        List<MonthlyAwardCalculator.AccuracyRow> rows = new ArrayList<>();
+        for (AnalysisRepository.GameRow g : analyses.playedBetween(MonthlyAwardCalculator.startsAt(month, zone),
+                MonthlyAwardCalculator.endsAt(month, zone))) {
+            if (g.whiteMoves() >= AnalysisService.MIN_MOVES) {
+                rows.add(new MonthlyAwardCalculator.AccuracyRow(g.whiteId(), g.whiteAccuracy()));
+            }
+            if (g.blackMoves() >= AnalysisService.MIN_MOVES) {
+                rows.add(new MonthlyAwardCalculator.AccuracyRow(g.blackId(), g.blackAccuracy()));
+            }
+        }
+        return rows;
     }
 
     /** The month's confirmed games, with expected scores from the ratings each side had before the game. */
@@ -258,6 +296,7 @@ public class AwardService {
 
     private static Award toAward(AwardRepository.Row row, Map<Long, User> people) {
         return new Award(row.month().toString(), row.kind(), PlayerRef.of(people.get(row.userId())), row.games(),
-                row.points(), row.expected(), row.points() - row.expected(), (int) Math.round(row.ratingChange()), row.decidedAt());
+                row.points(), row.expected(), row.points() - row.expected(), (int) Math.round(row.ratingChange()), row.accuracy(),
+                row.decidedAt());
     }
 }

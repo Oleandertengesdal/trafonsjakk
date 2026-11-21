@@ -141,24 +141,95 @@ Moves are checked for legality in the app (chess.js) before they're sent; the se
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/awards/race?month=` | Standings for a month (`YYYY-MM`, default this month) → `AwardRace`. Months from 2000-01 up to this month; anything else is 400 `award.bad_month`. |
-| GET | `/awards?player=` | Awards that were won, newest first (player of the month before most active within a month) → `Award[]`. With `player` (a username), only theirs; unknown player → 404 `player.not_found`. |
+| GET | `/awards?player=` | Awards that were won, newest first (player of the month, then most active, then most accurate within a month) → `Award[]`. With `player` (a username), only theirs; unknown player → 404 `player.not_found`. |
 
 ```ts
 AwardRace     { month: "2026-11", status: "LIVE"|"DECIDING"|"DECIDED", endsAt, decidesAt, minGames,
-                playerOfMonth: AwardCategory, mostActive: AwardCategory }
+                playerOfMonth: AwardCategory, mostActive: AwardCategory, mostAccurate: AccuracyCategory }
+AccuracyCategory { winner: Award | null, standings: { player: PlayerRef, games, accuracy, qualified }[] }  // max 20
 AwardCategory { winner: Award | null,            // set once the month is DECIDED and someone qualified
                 standings: AwardStanding[] }      // everyone who played, best first (max 20)
 AwardStanding { player: PlayerRef, games, wins, draws, losses, points, expected, overExpected, ratingChange, qualified }
-Award         { month, kind: "PLAYER_OF_MONTH"|"MOST_ACTIVE", player: PlayerRef, games, points, expected,
-                overExpected, ratingChange, decidedAt }
+Award         { month, kind: "PLAYER_OF_MONTH"|"MOST_ACTIVE"|"MOST_ACCURATE", player: PlayerRef, games, points,
+                expected, overExpected, ratingChange,
+                accuracy,        // MOST_ACCURATE only (then `games` counts analysed games); otherwise null
+                decidedAt }
 ```
 
 **The rules.** Only confirmed games count, and months follow Norwegian time (`app.awards.zone`, `Europe/Oslo`).
 
 - **Player of the month** has the most points over expectation: for each game, the score (1, ½, 0) minus the expected score from Glicko-2 at both players' ratings before the game (as on the game page). Beating a stronger player is worth more; playing more helps only if you play well. Over all players the total is zero. You need at least `minGames` (3) games and a positive total. Ties: more games, then the bigger rating gain, then the older account.
 - **Most active** played the most games (at least `minGames`). Ties: more points over expectation, then the older account.
+- **Most accurate** has the highest average accuracy over the month's *analysed* games (see Engine analysis below), counting only games where they made at least 10 moves; at least `minGames` such games. Ties: more games, then the older account. A game analysed after its month was decided doesn't change that month's winner.
 
 A month is `LIVE` until it ends, `DECIDING` for `app.awards.decide-after` (3 days, so late confirmations count), then `DECIDED`: the winners are stored once in `monthly_awards` and never change, even if an old game is corrected later. The standings for a decided month are still computed live. Deciding runs every hour, on startup and before every awards read, and is safe to run in parallel.
+
+## Engine analysis
+
+Stockfish runs in the browser. The first person to analyse a game saves the evaluation of every position here, so everyone else gets the review at once and the server can keep accuracy statistics.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/games/{id}/analysis` | → `Analysis`. 404 `analysis.not_found` if nobody has analysed it (or its moves have changed since). |
+| POST | `/games/{id}/analysis` | `{ depth, evals: Eval[] }` → `Analysis`. Saves it unless the game already has one, and returns the one that's kept (the first wins; 200 either way). `evals` needs one entry per position (the start and after every move, counted from the move text as the website reads it): 400 `analysis.wrong_length`. Each score is either `{cp}` (±100 000) or `{mate: 0–500, by: "w"|"b"}`, `best` is a UCI move or null, `depth` 1–99: otherwise 400 `analysis.invalid`. No moves: 409 `analysis.no_moves`. The server computes the accuracies itself. |
+| GET | `/users/{username}/accuracy` | → `PlayerAccuracy`: confirmed, analysed games where the player made at least 10 moves. |
+| GET | `/analysis/calibration` | → `Calibration`: "played like" fitted to the group's own ratings. |
+| DELETE | `/admin/games/{id}/analysis` | Admin: forget a game's analysis (the next person to analyse it saves a new one) → 204. |
+
+```ts
+Eval            { score: { cp } | { mate, by: "w"|"b" },   // from White's side; only the fields that apply
+                  best: "e2e4" | null }                    // the engine's move in that position
+Analysis        { gameId, depth, evals: Eval[], white: { moves, accuracy }, black: { moves, accuracy }, analysedAt }
+PlayerAccuracy  { games, average: number | null, best: GameAccuracy | null, recent: GameAccuracy[] }  // recent: last 30, oldest first
+GameAccuracy    { gameId, accuracy, colour: "WHITE"|"BLACK", result, opponent: PlayerRef, playedAt }
+Calibration     { samples, minSamples: 30, intercept: number | null, slope: number | null }
+```
+
+Accuracy is lichess's *game accuracy* (0–100), the same formula as the website. Changing a game's moves deletes its analysis. `Calibration` is a least-squares fit of each player's rating before the game on their accuracy in it, over analysed confirmed games with at least 10 of their moves; `intercept` and `slope` stay null until there are `minSamples` samples and higher accuracy actually goes with a higher rating.
+
+## Rivalries
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/rivalry/{a}/{b}` | Two players (usernames) against each other, from `a`'s side, confirmed games only → `Rivalry`. Unknown player → 404 `player.not_found`; the same twice → 400 `rivalry.same_player`. |
+
+```ts
+Rivalry       { a: PlayerRef, b: PlayerRef, overall: Record, aAsWhite: Record, aAsBlack: Record,
+                currentStreak: Streak, longestStreak: Streak,     // wins in a row; a draw ends a streak
+                biggestUpset: { gameId, winner: "A"|"B", gap, playedAt } | null,   // rating gap before the game
+                bestGames: { gameId, playedAt, aAccuracy, bAccuracy, average }[], // analysed games, best 3
+                games: Game[] }                                   // newest first
+Record        { games, aWins, draws, bWins, aPoints }
+Streak        { side: "A"|"B"|null, length }
+```
+
+The rating histories for the chart come from each player's `/users/{username}/stats`.
+
+## Opening explorer
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/openings/games?player=` | Confirmed games that have moves or a typed opening name, newest first → `OpeningGame[]`. With `player` (a username), only theirs; unknown → 404 `player.not_found`. |
+
+```ts
+OpeningGame { id, white: PlayerRef, black: PlayerRef, result, playedAt,
+              opening: string | null,   // as typed when the game was logged
+              moves: string | null }    // the first 30 half-moves as SAN, space-separated (comments, numbers etc. removed)
+```
+
+The website builds the move tree and names the openings itself (chess.js and the opening list are already there).
+
+## Push notifications
+
+Optional: on when the server has a VAPID key pair (`PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY`). When a game is logged and waits for confirmation, the players who have to confirm it get a notification on every browser they turned notifications on in (the tag `confirm-<id>`, tapping it opens `/games/<id>`).
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/push/key` | `{ publicKey }`: the VAPID public key for `pushManager.subscribe`; null when push is off. |
+| POST | `/push/subscriptions` | `{ endpoint, keys: { p256dh, auth } }` (the browser's `PushSubscription.toJSON()`) → 204. Adds this browser for the logged-in member (or moves it from whoever had it). Only the big push services' addresses are accepted: 400 `push.bad_endpoint`; bad keys: 400 `push.bad_keys`; push off: 409 `push.not_configured`. At most 10 per member (the oldest go). |
+| POST | `/push/subscriptions/remove` | `{ endpoint }` → 204. Turns it off for this member (someone else's browser is left alone). |
+| POST | `/push/status` | `{ endpoint }` → `{ subscribed }`: whether this browser gets this member's notifications. |
+| POST | `/push/test` | Sends a test to the member's own browsers and waits → `{ sent }` (how many the push services accepted). 409 `push.not_subscribed` without any. |
 
 ## Year in review ("Årets sjakk")
 
@@ -221,15 +292,17 @@ A game being played right now. A player (or an admin) records it on a phone: eve
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/tournaments` | Summaries, newest first |
-| POST | `/tournaments` | `{ name, format: "ROUND_ROBIN"|"SINGLE_ELIMINATION", doubleRoundRobin?, participantIds[] }` (`doubleRoundRobin` defaults to `false` and is ignored for knockouts) |
-| GET | `/tournaments/{id}` | Detail: participants, `rounds[{ number, name, matches[] }]`, `standings` (round-robin), `currentRound`, permissions |
+| POST | `/tournaments` | `{ name, format: "ROUND_ROBIN"|"SINGLE_ELIMINATION"|"SWISS", doubleRoundRobin?, participantIds[], rounds? }` (`doubleRoundRobin` defaults to `false` and only applies to round-robins; `rounds` (1–15) only to Swiss, default ⌈log₂ players⌉ + 1, and at most players − 1, settled when it starts) |
+| GET | `/tournaments/{id}` | Detail: participants, `rounds[{ number, name, matches[] }]`, `standings` (round-robin and Swiss), `currentRound`, `totalRounds` (Swiss: the planned number), permissions. The summary has `swissRounds`. |
 | PUT | `/tournaments/{id}/participants` | `{ participantIds }`. Creator/admin, during registration. |
 | POST | `/tournaments/{id}/join` · `/leave` | During registration |
-| POST | `/tournaments/{id}/start` | Creator/admin. Needs ≥ 2 players (≥ 3 for round-robin). Generates all fixtures. |
+| POST | `/tournaments/{id}/start` | Creator/admin. Needs ≥ 2 players (≥ 3 for round-robin and Swiss). Generates all fixtures (Swiss: only the first round; each next round is paired automatically when every game of the previous one has a result). |
 | POST | `/tournaments/{id}/cancel` | Creator/admin |
 | GET | `/tournaments/matches/mine` | Your playable matches (`READY`, no open game), for the "Log game" picker |
 
-`MatchDto`: `{ id, round, board, white, black, status: "WAITING"|"READY"|"COMPLETED"|"BYE", result, winner, games[], openGameId, needsReplay }`
+`MatchDto`: `{ id, round, board, white, black, status: "WAITING"|"READY"|"COMPLETED"|"BYE", result, winner, games[], openGameId, needsReplay }`. In a Swiss tournament a `BYE` has only `white`: the player who sits out (a free point).
+
+`StandingDto`: `{ rank, player, played, wins, draws, losses, points, sonnebornBerger, byes, buchholz }`. `byes` and `buchholz` are for Swiss (0 and null otherwise); a bye counts as a point but not as a game played.
 
 `MyMatchDto` (`/tournaments/matches/mine`): `{ matchId, tournamentId, tournamentName, format, round, totalRounds, roundName, white, black, needsReplay }`. `roundName` is English; the UI builds a localised name from `format`, `round` and `totalRounds`. `white`/`black` are the colours for the **next** game: the pairing's colours, or after a drawn knockout game the colours of the last game reversed (`needsReplay: true`).
 

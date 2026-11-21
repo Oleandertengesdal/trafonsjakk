@@ -22,6 +22,7 @@ export const race = (over: Partial<AwardRace> = {}): AwardRace => ({
   minGames: 3,
   playerOfMonth: { winner: null, standings: [] },
   mostActive: { winner: null, standings: [] },
+  mostAccurate: { winner: null, standings: [] },
   ...over,
 })
 
@@ -34,6 +35,7 @@ export const award = (player: PlayerRef, over: Partial<Award> = {}): Award => ({
   expected: 2.7,
   overExpected: 2.3,
   ratingChange: 61,
+  accuracy: null,
   decidedAt: '2026-11-03T23:07:00Z',
   ...over,
 })

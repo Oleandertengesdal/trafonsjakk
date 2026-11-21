@@ -63,7 +63,10 @@ export function TournamentDetailPage() {
             {td.meta(formatLabel, t.common.players(s.participantCount), s.createdBy.realName)}{' '}
             <span className={cn(s.status === 'IN_PROGRESS' && 'text-win', s.status === 'REGISTRATION' && 'text-gold')}>
               {t.tournamentStatus[s.status]}
-              {s.status === 'IN_PROGRESS' && d.totalMatches > 0 && ` ${td.progress(d.completedMatches, d.totalMatches)}`}
+              {s.status === 'IN_PROGRESS' &&
+                (s.format === 'SWISS'
+                  ? ` ${td.roundProgress(d.rounds.length, d.totalRounds)}`
+                  : d.totalMatches > 0 && ` ${td.progress(d.completedMatches, d.totalMatches)}`)}
             </span>
           </>
         }
@@ -102,6 +105,8 @@ export function TournamentDetailPage() {
         </Panel>
       ) : s.format === 'ROUND_ROBIN' ? (
         <RoundRobinView detail={d} />
+      ) : s.format === 'SWISS' ? (
+        <SwissView detail={d} />
       ) : (
         <Panel title={td.bracket}>
           <Bracket detail={d} />
@@ -189,6 +194,81 @@ function RoundRobinView({ detail: d }: { detail: TournamentDetail }) {
                 {r.matches.map((m) => (
                   <PairingLine key={m.id} match={m} />
                 ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </Panel>
+    </>
+  )
+}
+
+/** Swiss: the table (points, then Buchholz) and the rounds so far; the next round is paired when one ends. */
+function SwissView({ detail: d }: { detail: TournamentDetail }) {
+  const { t, f } = useI18n()
+  const td = t.tournamentDetail
+  const played = d.rounds.length
+  const finished = d.summary.status === 'COMPLETED'
+  return (
+    <>
+      <Panel title={td.standings}>
+        <p className="max-w-[65ch] px-5 text-sm text-muted">
+          {finished ? td.swissDone(played) : td.swissProgress(played, d.totalRounds)} {td.swissRule}
+        </p>
+        <div className="overflow-x-auto pb-2">
+          <table className="mt-2 w-full text-[0.9375rem]">
+            <caption className="sr-only">{td.standings}</caption>
+            <thead>
+              <tr className="text-left text-[0.8125rem] text-muted">
+                <th scope="col" className="w-12 px-5 py-2 font-medium">#</th>
+                <th scope="col" className="py-2 font-medium">{td.player}</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">{td.points}</th>
+                <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">{t.leaderboard.wdl}</th>
+                <th scope="col" className="px-5 py-2 text-right font-medium" title={td.buchholzHint}>
+                  {td.buchholz}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(d.standings ?? []).map((s) => (
+                <tr key={s.player.id} className="border-t border-line">
+                  <td className={cn('px-5 py-2.5 font-display font-semibold tabular-nums', s.rank === 1 ? 'text-gold' : 'text-faint')}>{s.rank}</td>
+                  <td className="py-2.5">
+                    <Link to={`/players/${s.player.username}`} className="flex items-center gap-2.5 hover:text-accent">
+                      <Avatar name={s.player.realName} seed={s.player.username} size="sm" />
+                      <span className="truncate">{s.player.realName}</span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-medium tabular-nums">{f.decimal1(s.points).replace(/[.,]0$/, '')}</td>
+                  <td className="hidden px-3 py-2.5 text-right text-muted tabular-nums sm:table-cell">
+                    {s.wins} / {s.draws} / {s.losses}
+                    {s.byes > 0 && <span className="ml-1.5 text-faint">{td.byes(s.byes)}</span>}
+                  </td>
+                  <td className="px-5 py-2.5 text-right text-muted tabular-nums">{f.decimal1(s.buchholz ?? 0).replace(/[.,]0$/, '')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+      <Panel title={td.pairings}>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3">
+          {[...d.rounds].reverse().map((r) => (
+            <section key={r.number} className="border-t border-line px-5 py-4">
+              <h3 className={cn('mb-2 text-sm font-medium', r.number === d.currentRound ? 'text-accent' : 'text-muted')}>
+                {roundName(t, 'SWISS', r.number, d.totalRounds)}
+                {r.number === d.currentRound && ` ${td.upNext}`}
+              </h3>
+              <ul className="flex flex-col gap-1.5">
+                {r.matches.map((m) =>
+                  m.status === 'BYE' && m.white ? (
+                    <li key={m.id} className="text-center text-[0.9375rem] text-muted">
+                      {td.bye(m.white.realName)}
+                    </li>
+                  ) : (
+                    <PairingLine key={m.id} match={m} />
+                  ),
+                )}
               </ul>
             </section>
           ))}

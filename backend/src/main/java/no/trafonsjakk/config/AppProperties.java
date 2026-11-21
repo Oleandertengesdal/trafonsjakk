@@ -14,7 +14,8 @@ public record AppProperties(
         Security security,
         Awards awards,
         String publicUrl,
-        GoogleChat googleChat) {
+        GoogleChat googleChat,
+        Push push) {
 
     public record Jwt(String secret, String issuer, Duration accessTokenTtl, Duration refreshTokenTtl) {
     }
@@ -39,6 +40,15 @@ public record AppProperties(
      * logged. Blank turns notifications off. {@code minInterval} keeps within Chat's one message a second.
      */
     public record GoogleChat(String webhookUrl, Duration minInterval) {
+    }
+
+    /**
+     * Web Push (notifications on members' phones and computers). A VAPID key pair in the usual base64url form
+     * (e.g. from {@code npx web-push generate-vapid-keys}); the private key is a secret: environment variable
+     * only. {@code subject} is a mailto: or https: contact for the push services (default: the site address).
+     * Blank keys turn push off. {@code allowLocalEndpoints} is for tests only.
+     */
+    public record Push(String vapidPublicKey, String vapidPrivateKey, String subject, boolean allowLocalEndpoints) {
     }
 
     /**

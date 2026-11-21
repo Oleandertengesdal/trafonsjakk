@@ -315,12 +315,18 @@ export const STRENGTH_MIN_MOVES = 10
 /**
  * "Played like a 1450": a rough rating for one side's play in one game, from its accuracy, to the nearest
  * 50 and between 400 and 2800. Null for short games. One game can be several hundred points off.
+ * With `fitted` (from the group's own analysed games) it's on the group's rating scale instead.
  */
-export function playedLike(side: Pick<SideSummary, 'accuracy' | 'moves'>): number | null {
+export function playedLike(
+  side: Pick<SideSummary, 'accuracy' | 'moves'>,
+  fitted?: { intercept: number | null; slope: number | null },
+): number | null {
   if (side.moves < STRENGTH_MIN_MOVES) return null
   const a = side.accuracy
   let rating: number
-  if (a <= STRENGTH[0][0]) {
+  if (fitted && fitted.intercept !== null && fitted.slope !== null) {
+    rating = fitted.intercept + fitted.slope * a
+  } else if (a <= STRENGTH[0][0]) {
     rating = STRENGTH[0][1]
   } else {
     const i = STRENGTH.findIndex(([acc]) => acc >= a)

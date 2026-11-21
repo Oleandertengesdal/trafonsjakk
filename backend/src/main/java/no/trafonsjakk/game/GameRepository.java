@@ -73,4 +73,10 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     @Query("select count(g) > 0 from Game g where g.match.id = :matchId "
             + "and g.status <> no.trafonsjakk.game.GameStatus.VOIDED")
     boolean existsActiveForMatch(@Param("matchId") Long matchId);
+
+    /** Confirmed games with moves or an opening name, for the opening explorer. */
+    @Query("select g from Game g join fetch g.white join fetch g.black "
+            + "where g.status = no.trafonsjakk.game.GameStatus.CONFIRMED and (g.moves is not null or g.opening is not null) "
+            + "order by g.playedAt desc, g.id desc")
+    List<Game> findConfirmedWithOpenings();
 }

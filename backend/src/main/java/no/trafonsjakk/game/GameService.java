@@ -7,6 +7,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import no.trafonsjakk.analysis.AnalysisRepository;
 import no.trafonsjakk.common.ApiException;
 import no.trafonsjakk.common.CurrentUser;
 import no.trafonsjakk.config.AppProperties;
@@ -15,6 +16,7 @@ import no.trafonsjakk.game.GameDtos.GameDto;
 import no.trafonsjakk.game.GameDtos.ResolveAction;
 import no.trafonsjakk.game.GameDtos.ResolveRequest;
 import no.trafonsjakk.notify.ChatEvents.GameLogged;
+import no.trafonsjakk.push.PushEvents.ConfirmationNeeded;
 import no.trafonsjakk.rating.RatingService;
 import no.trafonsjakk.tournament.MatchStatus;
 import no.trafonsjakk.tournament.TournamentMatch;
@@ -45,10 +47,12 @@ public class GameService {
     private final GameMapper mapper;
     private final AppProperties props;
     private final ApplicationEventPublisher events;
+    private final AnalysisRepository analyses;
 
     public GameService(GameRepository games, UserRepository users, TournamentMatchRepository matches,
                        TournamentService tournaments, RatingService ratings, GameMapper mapper,
-                       AppProperties props, ApplicationEventPublisher events) {
+                       AppProperties props, ApplicationEventPublisher events, AnalysisRepository analyses) {
+        this.analyses = analyses;
         this.props = props;
         this.events = events;
         this.games = games;
@@ -160,6 +164,12 @@ public class GameService {
         Game saved = games.save(game);
         events.publishEvent(new GameLogged(saved.getId(), white.getRealName(), black.getRealName(), saved.getResult(),
                 saved.getPlayedAt(), saved.getMatch() == null ? null : saved.getMatch().getTournament().getName()));
+        if (saved.getStatus() == GameStatus.PENDING) {
+            List<Long> confirmers = java.util.stream.Stream.of(white.getId(), black.getId())
+                    .filter(saved::canBeConfirmedBy).toList();
+            events.publishEvent(new ConfirmationNeeded(saved.getId(), confirmers, reporter.getRealName(),
+                    white.getRealName(), black.getRealName(), saved.getResult()));
+        }
         return mapper.toDto(saved, actor);
     }
 
@@ -278,7 +288,12 @@ public class GameService {
         if (!game.involves(actor.id()) && !actor.admin()) {
             throw ApiException.forbidden("game.not_a_player", "Only the players (or an admin) can add the moves");
         }
-        game.setMoves(moves == null || moves.isBlank() ? null : moves.trim());
+        String updated = moves == null || moves.isBlank() ? null : moves.trim();
+        if (!java.util.Objects.equals(updated, game.getMoves())) {
+            // The saved engine analysis was for the old moves
+            analyses.delete(id);
+        }
+        game.setMoves(updated);
         return mapper.toDto(game, actor);
     }
 

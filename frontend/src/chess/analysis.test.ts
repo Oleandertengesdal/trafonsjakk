@@ -182,6 +182,13 @@ describe('playedLike', () => {
     expect(ratings.every((r) => r % 50 === 0)).toBe(true)
   })
 
+  it('uses the group’s own scale once it has been fitted', () => {
+    const fitted = { intercept: 200, slope: 15 }
+    expect(playedLike({ accuracy: 80, moves: 30 }, fitted)).toBe(1400)
+    expect(playedLike({ accuracy: 10, moves: 30 }, fitted)).toBe(400)
+    expect(playedLike({ accuracy: 80, moves: 30 }, { intercept: null, slope: null })).toBe(1450)
+  })
+
   it('gives no estimate for a short game', () => {
     expect(playedLike({ accuracy: 95, moves: 9 })).toBeNull()
     expect(playedLike({ accuracy: 95, moves: 10 })).not.toBeNull()

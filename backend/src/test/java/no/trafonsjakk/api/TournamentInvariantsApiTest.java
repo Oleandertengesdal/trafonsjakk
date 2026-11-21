@@ -235,4 +235,71 @@ class TournamentInvariantsApiTest extends IntegrationTest {
         assertThat(jdbc.queryForList("select id, round(rating::numeric, 6) r, round(rating_deviation::numeric, 6) d from users order by id").toString())
                 .isEqualTo(before);
     }
+
+    @ParameterizedTest(name = "swiss with {0} players")
+    @ValueSource(ints = {3, 4, 5, 7, 8, 11, 16})
+    void swissTournamentsPairEveryRoundWithoutRematches(int n) {
+        Random rnd = new Random(n * 104729L);
+        List<Long> ids = bulkUsers(n, "sw");
+        long tid = start("SWISS", false, ids);
+        JsonNode t = detail(tid);
+        int planned = t.path("totalRounds").asInt();
+        assertThat(planned).isEqualTo(t.path("summary").path("swissRounds").asInt()).isBetween(1, n - 1);
+
+        Set<String> pairs = new HashSet<>();
+        Map<Long, Integer> byes = new HashMap<>();
+        Map<Long, Integer> whites = new HashMap<>();
+        Map<Long, Integer> blacks = new HashMap<>();
+        int round = 0;
+        while (detail(tid).path("summary").path("status").asString().equals("IN_PROGRESS")) {
+            round++;
+            assertThat(round).as("no more rounds than planned").isLessThanOrEqualTo(planned);
+            JsonNode current = detail(tid).path("rounds").get(round - 1);
+            assertThat(current.path("number").asInt()).isEqualTo(round);
+            Set<Long> seen = new HashSet<>();
+            for (JsonNode m : current.path("matches")) {
+                long w = m.path("white").path("id").asLong();
+                assertThat(seen.add(w)).as("everyone plays once a round").isTrue();
+                if (m.path("status").asString().equals("BYE")) {
+                    byes.merge(w, 1, Integer::sum);
+                    continue;
+                }
+                long b = m.path("black").path("id").asLong();
+                assertThat(seen.add(b)).isTrue();
+                assertThat(pairs.add(Math.min(w, b) + "-" + Math.max(w, b))).as("no rematches").isTrue();
+                whites.merge(w, 1, Integer::sum);
+                blacks.merge(b, 1, Integer::sum);
+            }
+            assertThat(seen).hasSize(n);
+            for (JsonNode m : current.path("matches")) {
+                if (!m.path("status").asString().equals("BYE")) {
+                    double x = rnd.nextDouble();
+                    play(m, x < 0.4 ? "WHITE_WIN" : x < 0.75 ? "BLACK_WIN" : "DRAW");
+                }
+            }
+        }
+        JsonNode done = detail(tid);
+        assertThat(done.path("summary").path("status").asString()).isEqualTo("COMPLETED");
+        assertThat(round).as("all planned rounds were played").isEqualTo(planned);
+        byes.values().forEach(c -> assertThat(c).as("at most one bye each").isEqualTo(1));
+        for (Long id : ids) {
+            assertThat(Math.abs(whites.getOrDefault(id, 0) - blacks.getOrDefault(id, 0))).as("colours balanced").isLessThanOrEqualTo(2);
+        }
+
+        // The table adds up: points from games plus byes, and Buchholz is the sum of the opponents' points
+        JsonNode standings = done.path("standings");
+        assertThat(standings).hasSize(n);
+        Map<Long, Double> points = new HashMap<>();
+        standings.forEach(s -> points.put(s.path("player").path("id").asLong(), s.path("points").asDouble()));
+        double total = points.values().stream().mapToDouble(Double::doubleValue).sum();
+        assertThat(total).isEqualTo(pairs.size() + byes.values().stream().mapToInt(Integer::intValue).sum(), within(1e-9));
+        for (JsonNode s : standings) {
+            long id = s.path("player").path("id").asLong();
+            double buchholz = pairs.stream().filter(p -> p.startsWith(id + "-") || p.endsWith("-" + id))
+                    .mapToDouble(p -> points.get(Long.parseLong(p.startsWith(id + "-") ? p.substring(p.indexOf('-') + 1) : p.substring(0, p.indexOf('-')))))
+                    .sum();
+            assertThat(s.path("buchholz").asDouble()).isCloseTo(buchholz, within(1e-9));
+        }
+        assertThat(done.path("summary").path("winner").path("id").asLong()).isEqualTo(standings.get(0).path("player").path("id").asLong());
+    }
 }

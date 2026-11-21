@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { gamesApi } from '../../api/endpoints'
+import { analysisApi, gamesApi } from '../../api/endpoints'
 import type { Game } from '../../api/types'
 import { splitMovetext, type MovePair } from '../../chess/movetext'
 import { useAuth } from '../../auth/AuthProvider'
@@ -30,6 +30,15 @@ export function GameMoves({ game }: { game: Game }) {
       qc.setQueryData(['games', 'detail', game.id], updated)
       setEditing(false)
       toast(m.saved, 'success')
+    },
+    onError: (e) => toast(errorText(e), 'error'),
+  })
+  // Admin: if a saved review looks wrong, forget it and the next person to analyse makes a new one
+  const forget = useMutation({
+    mutationFn: () => analysisApi.forget(game.id),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: ['analysis', game.id] })
+      toast(m.analysisForgotten, 'success')
     },
     onError: (e) => toast(errorText(e), 'error'),
   })
@@ -69,6 +78,7 @@ export function GameMoves({ game }: { game: Game }) {
       {rows ? (
         <Suspense fallback={<MoveList rows={rows} label={m.list} />}>
           <GameViewer
+            gameId={game.id}
             moves={game.moves!}
             orientation={me?.id === game.black.id ? 'black' : 'white'}
             whiteName={game.white.realName}
@@ -81,10 +91,19 @@ export function GameMoves({ game }: { game: Game }) {
         </p>
       ) : null}
       {game.canEditMoves && !game.moves && <p className="text-[0.9375rem] text-muted">{m.optionalHint}</p>}
-      {game.canEditMoves && (
-        <Button variant="secondary" size="sm" className="self-start" onClick={() => setEditing(true)}>
-          {game.moves ? m.edit : m.add}
-        </Button>
+      {(game.canEditMoves || (me?.role === 'ADMIN' && game.moves)) && (
+        <div className="flex flex-wrap gap-2">
+          {game.canEditMoves && (
+            <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+              {game.moves ? m.edit : m.add}
+            </Button>
+          )}
+          {me?.role === 'ADMIN' && game.moves && (
+            <Button variant="ghost" size="sm" loading={forget.isPending} onClick={() => forget.mutate()} title={m.forgetAnalysisHint}>
+              {m.forgetAnalysis}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   )

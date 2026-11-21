@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Flame, Trophy } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { awardsApi } from '../../api/endpoints'
 import type { Award, AwardRace } from '../../api/types'
 import { points, signed } from '../../i18n/format'
@@ -11,6 +11,7 @@ import { Avatar } from '../chess/Avatar'
 import { ErrorNotice } from '../ui/ErrorNotice'
 import { Panel } from '../ui/Panel'
 import { SkeletonRows } from '../ui/Skeleton'
+import { AwardIcon } from './AwardIcon'
 import { nextMonth, previousMonth } from './month'
 
 /** Ratings page: the month's full standings (step back through earlier months) and every earlier winner. */
@@ -65,6 +66,7 @@ export function AwardsPanel() {
         <div className="flex flex-col gap-6 pb-5">
           <p className="max-w-[65ch] px-5 pt-1 text-[0.9375rem] text-muted">{a.rule(q.data.minGames)}</p>
           <Standings race={q.data} live={!month} />
+          <AccuracyStandings race={q.data} live={!month} />
           <History />
         </div>
       )}
@@ -116,8 +118,8 @@ function Standings({ race, live }: { race: AwardRace; live: boolean }) {
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 font-medium">
                         <span className="truncate">{s.player.realName}</span>
-                        {s.player.id === winnerId && <Trophy role="img" aria-label={a.kind.PLAYER_OF_MONTH} className="size-4 shrink-0 text-gold" />}
-                        {s.player.id === active?.player.id && <Flame role="img" aria-label={a.kind.MOST_ACTIVE} className="size-4 shrink-0 text-gold" />}
+                        {s.player.id === winnerId && <AwardIcon kind="PLAYER_OF_MONTH" label={a.kind.PLAYER_OF_MONTH} />}
+                        {s.player.id === active?.player.id && <AwardIcon kind="MOST_ACTIVE" label={a.kind.MOST_ACTIVE} />}
                       </span>
                       {!s.qualified && <span className="block text-[0.8125rem] text-faint">{a.gamesOf(s.games, race.minGames)}</span>}
                     </span>
@@ -136,6 +138,64 @@ function Standings({ race, live }: { race: AwardRace; live: boolean }) {
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** The month's most accurate players: average accuracy over their analysed games. */
+function AccuracyStandings({ race, live }: { race: AwardRace; live: boolean }) {
+  const { t, f } = useI18n()
+  const a = t.awards
+  const rows = race.mostAccurate.standings.slice(0, 5)
+  const winnerId = race.mostAccurate.winner?.player.id
+  let place = 0
+  return (
+    <section aria-labelledby="most-accurate" className="border-t border-line pt-4">
+      <h3 id="most-accurate" className="flex items-center gap-1.5 px-5 font-display text-[0.9375rem] font-semibold">
+        <AwardIcon kind="MOST_ACCURATE" /> {a.kind.MOST_ACCURATE}
+      </h3>
+      <p className="max-w-[65ch] px-5 pt-1 text-sm text-muted">{a.accurateRule(race.minGames)}</p>
+      {rows.length === 0 ? (
+        <p className="px-5 pt-2 text-[0.9375rem] text-muted">{live ? a.noAnalysedYet : a.noAnalysedThen}</p>
+      ) : (
+        <table className="mt-2 w-full text-[0.9375rem]">
+          <caption className="sr-only">{a.accurateCaption(f.monthYear(race.month))}</caption>
+          <thead>
+            <tr className="text-left text-[0.8125rem] text-muted">
+              <th scope="col" className="w-12 px-5 py-2 font-medium">#</th>
+              <th scope="col" className="py-2 font-medium">{a.player}</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">{a.analysedGames}</th>
+              <th scope="col" className="px-5 py-2 text-right font-medium">{a.accuracy}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s) => {
+              if (s.qualified) place++
+              return (
+                <tr key={s.player.id} className={cn('border-t border-line', !s.qualified && 'text-muted')}>
+                  <td className={cn('px-5 py-2.5 font-display font-semibold tabular-nums', place === 1 && s.qualified ? 'text-gold' : 'text-faint')}>
+                    {s.qualified ? place : ''}
+                  </td>
+                  <td className="py-2.5">
+                    <Link to={`/players/${s.player.username}`} className="flex items-center gap-3 hover:text-accent">
+                      <Avatar name={s.player.realName} seed={s.player.username} size="sm" />
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          <span className="truncate">{s.player.realName}</span>
+                          {s.player.id === winnerId && <AwardIcon kind="MOST_ACCURATE" label={a.kind.MOST_ACCURATE} />}
+                        </span>
+                        {!s.qualified && <span className="block text-[0.8125rem] text-faint">{a.gamesOf(s.games, race.minGames)}</span>}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{s.games}</td>
+                  <td className="px-5 py-2.5 text-right font-medium tabular-nums">{f.pct(s.accuracy / 100)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
   )
 }
 
@@ -168,12 +228,16 @@ function History() {
               <ul className="flex flex-wrap gap-x-5 gap-y-1">
                 {m.awards.map((w) => (
                   <li key={w.kind} className="flex items-center gap-1.5">
-                    {w.kind === 'PLAYER_OF_MONTH' ? <Trophy aria-hidden className="size-4 text-gold" /> : <Flame aria-hidden className="size-4 text-gold" />}
+                    <AwardIcon kind={w.kind} />
                     <Link to={`/players/${w.player.username}`} className="font-medium hover:text-accent">
                       {w.player.realName}
                     </Link>
                     <span className="text-sm text-muted">
-                      {w.kind === 'PLAYER_OF_MONTH' ? f.signedDecimal(w.overExpected) : t.common.games(w.games)}
+                      {w.kind === 'PLAYER_OF_MONTH'
+                        ? f.signedDecimal(w.overExpected)
+                        : w.kind === 'MOST_ACCURATE'
+                          ? f.pct((w.accuracy ?? 0) / 100)
+                          : t.common.games(w.games)}
                     </span>
                   </li>
                 ))}

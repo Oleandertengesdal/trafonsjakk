@@ -75,6 +75,8 @@ erDiagram
     GAME_COMMENTS ||--o{ COMMENT_LIKES : has
     GAMES ||--o{ GAME_KUDOS : has
     USERS ||--o{ MONTHLY_AWARDS : wins
+    GAMES ||--o| GAME_ANALYSES : "analysed in"
+    USERS ||--o{ PUSH_SUBSCRIPTIONS : "gets notifications on"
     USERS ||--o{ LIVE_GAMES : plays
     LIVE_GAMES |o--o| GAMES : "becomes"
 
@@ -163,13 +165,33 @@ erDiagram
     }
     MONTHLY_AWARDS {
         date month PK "first day"
-        varchar kind PK "PLAYER_OF_MONTH | MOST_ACTIVE"
+        varchar kind PK "PLAYER_OF_MONTH | MOST_ACTIVE | MOST_ACCURATE"
         bigint user_id FK "null = nobody qualified"
         int games
         float points
         float expected
         float rating_change
+        float accuracy "MOST_ACCURATE only"
         timestamptz decided_at
+    }
+    PUSH_SUBSCRIPTIONS {
+        bigint id PK
+        bigint user_id FK
+        varchar endpoint UK "the browser's push service address"
+        varchar p256dh "browser's public key"
+        varchar auth "browser's auth secret"
+        timestamptz created_at
+    }
+    GAME_ANALYSES {
+        bigint game_id PK,FK
+        char moves_hash "SHA-256 of the move text"
+        smallint depth
+        int plies
+        text evals "JSON, one per position"
+        float white_accuracy
+        float black_accuracy
+        bigint analysed_by FK
+        timestamptz created_at
     }
     LIVE_GAMES {
         bigint id PK
@@ -194,9 +216,10 @@ erDiagram
     TOURNAMENTS {
         bigint id PK
         varchar name
-        varchar format "ROUND_ROBIN | SINGLE_ELIMINATION"
+        varchar format "ROUND_ROBIN | SINGLE_ELIMINATION | SWISS"
         varchar status "REGISTRATION | IN_PROGRESS | COMPLETED | CANCELLED"
         boolean double_round_robin
+        int swiss_rounds "Swiss only"
         bigint created_by FK
         bigint winner_id FK
     }
@@ -280,6 +303,8 @@ no.trafonsjakk
 │                  RoundRobinScheduler, KnockoutBracket, StandingsCalculator (pure)
 ├── stats/         PlayerStatsCalculator (pure), StatsService
 ├── notify/        ChatEvents, ChatNotifications (listener), ChatMessages (texts), GoogleChatClient
+├── push/          WebPush (encryption + VAPID, JDK only), PushService, PushNotifications (listener), PushController
+├── analysis/      GameAccuracy, MoveText, AnalysisService (saved reviews, profile accuracy, calibration)
 └── admin/         AdminController, ChatAdminController
 ```
 
@@ -343,7 +368,7 @@ For a friend group (hundreds to a few thousand games) this takes milliseconds. I
 
 ### 3.5 Tournament engine
 
-**Creating:** any member creates a tournament, picks a format and adds participants (2–32). Members can join or leave while it's in `REGISTRATION`. The creator or an admin starts it; starting freezes the player list, assigns seeds by current rating and generates every fixture at once.
+**Creating:** any member creates a tournament, picks a format and adds participants (2–32). Members can join or leave while it's in `REGISTRATION`. The creator or an admin starts it; starting freezes the player list, assigns seeds by current rating and generates every fixture at once (Swiss: one round at a time).
 
 **Round-robin (Berger / circle method)**
 
@@ -364,6 +389,14 @@ For a friend group (hundreds to a few thousand games) this takes milliseconds. I
 - **Draws in a knockout:** the draw counts for ratings, but the match stays open and the players play again with colours reversed until there's a decisive game. The UI shows "Drawn — replay with colours reversed".
 - Winning the final completes the tournament and sets the winner.
 
+**Swiss (monrad)**
+
+- For more players than a round-robin suits: a set number of rounds (default ⌈log₂ n⌉ + 1, at most n − 1 and 15), and only the first is paired at the start. When every game of the latest round has a result, `reevaluateMatch` pairs the next one; after the last, the tournament completes with the top of the standings as winner.
+- `SwissPairing` (pure) ranks players by score, then seed. With an odd number, the lowest-ranked player who hasn't had a bye sits out (a `BYE` match with only `white`, worth a point). From the top, each player is paired within their score group with the player half a group further down ("top half against bottom half"), or the nearest one after that, never someone they've already played; when that leaves the rest unpairable it backtracks, and players float down to the next group when needed. If no pairing without a rematch exists (a late round of a long tournament), the tournament ends early.
+- Colours: whoever has had White less gets White; if equal, whoever had Black last; otherwise alternating by board.
+- **Standings** (`SwissStandings`): 1 / ½ / 0 and 1 for a bye; ties by **Buchholz** (the sum of the opponents' points: whoever met the stronger field ranks higher), then Sonneborn–Berger, wins and seed.
+- A result changed later updates the standings; rounds already paired stay as they are, as in a real Swiss. The tests play whole Swiss tournaments of 3–16 players with random results and check: everyone plays once a round, no rematches, at most one bye each, colours balanced within two, and the table and Buchholz add up.
+
 **Live updates:** tournament progress is event-driven. When a game linked to a match is confirmed, voided or corrected, `TournamentService.reevaluateMatch()` recomputes that match's outcome from its confirmed games and applies the difference (advance, un-advance, complete, reopen). An admin can't change a knockout result after the next round has started; the API returns `409 Conflict` instead of corrupting the bracket.
 
 ### 3.6 Statistics
@@ -382,10 +415,11 @@ For a friend group (hundreds to a few thousand games) this takes milliseconds. I
 
 ### 3.7 Monthly awards ("Månedens spiller")
 
-Two awards per calendar month (Norwegian time), from confirmed games only:
+Three awards per calendar month (Norwegian time), from confirmed games only:
 
 - **Player of the month:** the most *points over expectation*: for each game, the score (1, ½, 0) minus Glicko-2's expected score at both players' pre-game ratings (taken from `rating_history`, the same numbers as the game page). The underdog who beats stronger players wins, not simply the highest-rated player, and every extra game counts if it's played well. Summed over everyone it's zero. At least 3 games and a positive total; ties go to more games, then the bigger rating gain, then the older account.
 - **Most active:** the most games (at least 3); ties go to the better performance.
+- **Most accurate:** the highest average accuracy over the month's analysed games (§4.4), counting games where the player made at least 10 moves; at least 3 such games. Ties go to more games, then the older account. Only games analysed by the time the month is decided count.
 
 `MonthlyAwardCalculator` holds these rules as pure functions. `AwardService` computes standings on the fly for any month, and *decides* a month 3 days after it ends (so late confirmations count): it inserts one row per award into `monthly_awards` with `on conflict do nothing`, and never updates it. Deciding runs hourly, on startup and before every awards read (the same "free hosting sleeps" reasoning as auto-confirm), and catches up on every finished month that isn't decided yet. The zone, grace period and minimum are `app.awards.*` settings.
 
@@ -404,6 +438,10 @@ Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board 
 With `GOOGLE_CHAT_WEBHOOK_URL` set, the API posts to a Google Chat space through its incoming webhook. `LiveGameService.start` and `GameService.create` publish `LiveGameStarted` / `GameLogged` events; `ChatNotifications` handles them with `@TransactionalEventListener`, so a message is only sent once the change has been committed (a refused request announces nothing). The text (Norwegian, names escaped) comes from `ChatMessages`; the link to the site uses `APP_PUBLIC_URL` and is left out without it. Each message has a `threadKey`: `live-<id>` for a live game and for the game it turns into, so the result is a reply under the start, otherwise `game-<id>`. Games dated more than 3 days back aren't announced.
 
 `GoogleChatClient` sends from one background thread with a bounded queue (100), at most one message every 1.1 s (Chat's limit is one a second per space), 5 s connect and 10 s request timeouts, and two retries with backoff for 429, 5xx and network errors. Other answers (a deleted webhook, say) drop the message with a warning. It only accepts `https://chat.googleapis.com/v1/spaces/…` links (plain `http` on localhost for tests); anything else logs an error at startup and leaves chat off. The link is a secret and is never logged. Messages with a thread key are sent with `messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`; the test message has neither. Admin → Google Chat shows whether it's on and sends a test message; if Google refuses it, the admin sees Google's status and explanation.
+
+### 3.9c Push notifications (optional)
+
+With a VAPID key pair in the environment, members can turn on notifications per browser (Settings → Notifications). `lib/push.ts` checks what's possible (no push in this browser; iPhone/iPad needs the home-screen app; push off on the server; blocked), asks for permission, subscribes with the server's public key and posts the subscription. `GameService.create` publishes `ConfirmationNeeded` for a pending game with the players who have to confirm it; `PushNotifications` handles it after commit and `PushService` sends from one background thread. `WebPush` does the cryptography with the JDK only: the message is encrypted for the browser (RFC 8291, `aes128gcm`: ECDH with a fresh key, HKDF, AES-128-GCM) and the request carries a VAPID JWT signed with ES256 (RFC 8292). A 404/410 from the push service deletes the subscription. Only the big push services' hosts are accepted as endpoints (no SSRF). The service worker (`public/sw.js`) shows the notification and opens the game when it's tapped (only same-origin URLs). Tests decrypt what the server sends with a pretend browser's keys and verify the VAPID signature.
 
 ### 3.10 Your data and deleting an account
 
@@ -494,10 +532,11 @@ src/
 │   ├── year/                    StoryViewer, StoryCard, player and group slides, shareCard (card → PNG),
 │   │                            YearBanner (home, December–January)
 │   └── admin/                   ResetLinkButton
-├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts,
+├── chess/                       moves.ts (chess.js: legality, PGN, move statistics), movetext.ts, explorer.ts
+│                                (opening tree), openingKey.ts, openings.json (opening names, CC0),
 │                                engine.ts (Stockfish over UCI in a Web Worker), analysis.ts (scores, judgements,
-│                                accuracy), useStockfish.ts (one engine per board: review, cached in this
-│                                browser, then live lines)
+│                                accuracy, "played like"), useStockfish.ts (one engine per board: review,
+│                                cached in this browser, then live lines)
 ├── pages/                       one file per route
 ├── i18n/                        en.ts, nb.ts (dictionaries), I18nProvider, format.ts (locale-aware
 │                                dates/numbers), rounds.ts, useErrorText.ts (server error codes → text)
@@ -509,8 +548,8 @@ src/
 Analysis is optional and only offered for games with recorded moves. Nothing runs until someone presses **Analyse** under the board; the choice is remembered on the device (and shared with live games). Everything Stockfish does for one board goes through **one engine** (`useStockfish`), so a phone never runs two at once:
 
 1. `Engine.load()` starts Stockfish 18 (the 7 MB "lite, single-threaded" WebAssembly build in `public/engine`, GPLv3, served unmodified from our own origin) in a **Web Worker** and does the UCI handshake. Single-threaded means no cross-origin-isolation headers are needed. The worker is terminated when analysis is switched off or the page closes.
-2. **Review**, once per game: every position is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. Results are kept in `localStorage`, keyed by a hash of the moves and the depth, so the next time it's instant. Nothing is sent to the server.
-3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, and a player's accuracy for the game is lichess's *game accuracy*: the average of a weighted mean and a harmonic mean of their move accuracies. Each move is weighted by how much White's winning chance swings in a window of positions around it (standard deviation, 0.5–12), so moves in a sharp position count for more than moves in a quiet or already decided one, and a long, easy, won endgame doesn't hide the blunders; the harmonic mean makes a few terrible moves weigh heavily. `playedLike()` turns a player's accuracy into a rough rating ("≈1450", shown under the accuracy) by interpolating between rule-of-thumb points (75 % ≈ 1200, 80 % ≈ 1450, 85 % ≈ 1700, 90 % ≈ 2000, …), rounded to 50 and kept between 400 and 2800, and only for a player with at least 10 moves. There's no agreed formula for this, and one game's accuracy says little about a player's rating (studies find it explains only a small part of the difference), so the page says it's a rough estimate for this game.
+2. **Review**, once per game: every position is evaluated to depth 14 (at most 1.5 s each); finished positions (mate, stalemate, draws) are scored without the engine. A short game takes a few seconds, a long one under a minute on a phone. **The review is shared:** before reviewing, the viewer asks the server for a saved analysis (`GET /api/games/{id}/analysis`); if there is one, it's used and the engine only does the live lines. If not, the browser reviews the game and saves the evaluations (`POST`), so nobody has to do it again. The first save wins; changing the moves deletes it; an admin can delete one from the game page. The server (`analysis` package) checks the shape (one entry per position, counted from the move text with `MoveText`, the same tokenizer as the website), computes both players' accuracy with `GameAccuracy` (a Java port of the formula below, checked against the website's numbers in a test), and uses it for profile statistics (average accuracy, best-played game), the *most accurate* award and the "played like" calibration. The review is also kept in `localStorage`, keyed by a hash of the moves and the depth, so it still works when the server can't be reached.
+3. `reviewGame()` turns the scores into win percentages (lichess's curve) and judges each move by how much winning chance it gave away: 10 points is an inaccuracy (?!), 20 a mistake (?), 30 a blunder (??). Allowing a mate is always a blunder; throwing away a forced mate is a mistake unless the position is still easily won. The engine's own move is never marked. Accuracy per move uses lichess's formula, and a player's accuracy for the game is lichess's *game accuracy*: the average of a weighted mean and a harmonic mean of their move accuracies. Each move is weighted by how much White's winning chance swings in a window of positions around it (standard deviation, 0.5–12), so moves in a sharp position count for more than moves in a quiet or already decided one, and a long, easy, won endgame doesn't hide the blunders; the harmonic mean makes a few terrible moves weigh heavily. `playedLike()` turns a player's accuracy into a rough rating ("≈1450", shown under the accuracy) by interpolating between rule-of-thumb points (75 % ≈ 1200, 80 % ≈ 1450, 85 % ≈ 1700, 90 % ≈ 2000, …), rounded to 50 and kept between 400 and 2800, and only for a player with at least 10 moves. There's no agreed formula for this, and one game's accuracy says little about a player's rating (studies find it explains only a small part of the difference), so the page says it's a rough estimate for this game. Once the group has 30 analysed player-games, `GET /api/analysis/calibration` fits a straight line from accuracy to the players' own ratings before the game, and "played like" uses that instead: a rating on the group's scale ("how players here who play this accurately are usually rated"), which the page says.
 4. **Live lines**, after the review: the same engine thinks about the position on the board to depth 18 with its three best lines (MultiPV), reporting as it looks deeper. `Engine` runs one job at a time (`enqueue`): a new position stops the old search first, and a review position goes back to one line.
 5. With analysis on, the viewer shows the evaluation bar, a graph of the game (tap to jump), the marks in the move list, one sentence about the move just played ("Feil: kostet 3,3 bønder. Bedre var 5. Bxf7+."), the engine panel with its three lines and the depth, and accuracy per player. With it off, the page is just the board, the moves and a few numbers about the game.
 6. **Your own moves:** with analysis on you can drag a piece, tap a piece and then a square, or tap one of the engine's lines. The game's own next move just steps forward; anything else starts *your own line* branching off the game, which the engine follows. "Previous move" takes back your last move; the ✕ (or stepping through the game) goes back to the game.
@@ -519,9 +558,17 @@ Keeping it smooth: the board is a memoized component that only redraws when the 
 
 The CSP allows this with `script-src 'self' 'wasm-unsafe-eval'` and `worker-src 'self'`; JavaScript `eval` stays forbidden.
 
+### 4.4a Opening explorer
+
+`/openings` (`OpeningsPage`, loaded lazily) fetches the confirmed games' first 30 half-moves (`GET /api/openings/games`) and builds the explorer in the browser (`chess/explorer.ts`): every game is replayed with chess.js, and each position is keyed by `positionKey()` (a hash of the FEN's pieces, side to move, castling and en passant), so the same position reached by another move order is merged, as on lichess. Each position has the moves played from it with White wins / draws / Black wins and the score (for one player: their wins, draws, losses and score, optionally only as White or Black), and the games that went through it. Openings are named from lichess's CC0 opening list, turned into `chess/openings.json` (≈3 900 positions, ≈50 kB gzipped, loaded as a hashed file only on this page) by `scripts/build-openings.mjs`; a game is named by the last named position it reaches and grouped by family ("Sicilian Defense"), and games without moves count under the name typed when they were logged. The filters and the line are in the URL, so a position can be shared.
+
+### 4.4a2 Rivalry pages
+
+`/rivalry/:a/:b` (`RivalryPage`) shows two players against each other. `GET /api/rivalry/{a}/{b}` (`rivalry` package) loads their confirmed games and `RivalryCalculator` (pure) works out the record overall and by colour, the current and longest winning streak (a draw ends one), the biggest upset (the largest pre-game rating gap the lower-rated player overcame, from `rating_history`) and the three best-played games (highest average accuracy of both players, from saved analyses). The page draws both rating histories on one chart (`RivalryChart`: two stepped lines, a legend and a shared tooltip) from the players' existing stats, and lists every game. Profiles' head-to-head rows and the game page's head-to-head section link here; a picker switches the opponent.
+
 ### 4.4b Installable app (PWA)
 
-`public/manifest.webmanifest` (standalone, icons incl. a maskable one, shortcuts to Live, Log game and TV) and the Apple meta tags in `index.html` let people add Trafonsjakk to the home screen of a phone or tablet, where it opens without the browser bar. `public/sw.js` is deliberately minimal: it caches nothing but an offline page, so every deploy shows up immediately. It's registered only in production builds. `useWakeLock` keeps the screen on during a live game and on the TV (Screen Wake Lock API; quietly does nothing where unsupported).
+`public/manifest.webmanifest` (standalone, icons incl. a maskable one, shortcuts to Live, Log game and TV) and the Apple meta tags in `index.html` let people add Trafonsjakk to the home screen of a phone or tablet, where it opens without the browser bar. `public/sw.js` is deliberately minimal: it caches nothing but an offline page, so every deploy shows up immediately. It also shows push notifications (§3.9c). It's registered only in production builds. `useWakeLock` keeps the screen on during a live game and on the TV (Screen Wake Lock API; quietly does nothing where unsupported).
 
 ### 4.4c Error alerts (optional)
 

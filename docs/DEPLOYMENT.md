@@ -87,6 +87,16 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 ## Step 6 (optional): Nice-to-haves
 
 - **Error alerts (Sentry, free plan):** create a project at sentry.io (platform: React). In its settings, turn on *Prevent Storing of IP Addresses*. Copy the DSN, add it in Vercel → Project → Settings → Environment Variables as `VITE_SENTRY_DSN` (Production), and redeploy. You then get an email when someone's browser crashes or the API returns a 500. The DSN isn't a secret (it ends up in the public JavaScript, as Sentry intends), but keep it out of Git anyway. Remove the variable and redeploy to switch it off.
+- **Push notifications:** a notification on members' phones and computers when someone logs a game against them ("Ola Hansen registrerte et parti mot deg"), so they confirm it instead of waiting for the 48-hour auto-confirm.
+  1. Make a key pair once, on your own computer (Node only, nothing to install):
+     ```bash
+     node -e "const e=require('crypto').createECDH('prime256v1');e.generateKeys();console.log('PUSH_VAPID_PUBLIC_KEY='+e.getPublicKey('base64url'));console.log('PUSH_VAPID_PRIVATE_KEY='+e.getPrivateKey('base64url'))"
+     ```
+     (`npx web-push generate-vapid-keys` gives the same kind of pair.)
+  2. In Render → the service → **Environment**, add `PUSH_VAPID_PUBLIC_KEY` and `PUSH_VAPID_PRIVATE_KEY`. `APP_PUBLIC_URL` must be set too (the push services want a contact address; or set `PUSH_SUBJECT` to `mailto:you@…`). The log says "Push notifications are on".
+  3. Each member turns them on per device in **Settings → Notifications**, and can send themselves a test. On iPhone and iPad this only works after adding the site to the home screen and opening it from there (iOS 16.4 or newer).
+
+  **The private key is a secret:** keep it in Render only, never in a file in the repo. Changing the keys means everyone has to turn notifications on again. Leave the variables out to turn push off.
 - **Google Chat messages:** a message in a Google Chat space when a live game starts and when a game is logged (a finished live game's result goes in the same thread as its start).
   1. In Google Chat, open the space → its name at the top → **Apps & integrations** → **Webhooks** → **Add webhook**. Give it a name (e.g. *Trafonsjakk*) and save. Copy the link. It looks like `https://chat.googleapis.com/v1/spaces/…/messages?key=…&token=…`.
   2. In Render → the service → **Environment**, add `GOOGLE_CHAT_WEBHOOK_URL` with that link, and `APP_PUBLIC_URL` with the site's address (e.g. `https://<project>.vercel.app`, used for the "Følg direkte" / "Se partiet" links). Save; the service restarts.
@@ -106,7 +116,7 @@ Commit and push. (The URL isn't a secret, and Vercel rewrites can't read environ
 ## Before you push
 
 - `git status` should show **no** `.env`, `.env.local` or `application-local.yml` files. They're git-ignored, but check anyway.
-- Real secrets live **only** in Render's environment settings: `JWT_SECRET`, the `DATABASE_*` values, `BOOTSTRAP_INVITE_CODE` and `GOOGLE_CHAT_WEBHOOK_URL`.
+- Real secrets live **only** in Render's environment settings: `JWT_SECRET`, the `DATABASE_*` values, `BOOTSTRAP_INVITE_CODE`, `GOOGLE_CHAT_WEBHOOK_URL` and `PUSH_VAPID_PRIVATE_KEY`.
 - The only credential-looking values in the repo are the documented local-dev placeholders (`trafonsjakk` DB password, `dev-only-insecure-jwt-secret…`, `let-me-in`). The prod profile refuses to start with the dev JWT secret.
 - CI runs gitleaks on every push and fails the build if anything secret-shaped shows up.
 
@@ -125,6 +135,7 @@ Push to `main`. Render rebuilds the API when `backend/**` changes (`buildFilter`
 | Need to fix ratings | Admin → **Recompute ratings** replays every confirmed game. This is safe to run at any time. |
 | Rotate `JWT_SECRET` | Change it in Render. Everyone is logged out once; nothing else is affected. |
 | Leaked DB password | Reset it in Neon, update `DATABASE_PASSWORD` in Render. |
+| Leaked push private key | Make a new key pair and put both in Render. Everyone has to turn notifications on again in Settings. |
 | Leaked Google Chat webhook link | In the space, delete the webhook (Apps & integrations → Webhooks) and add a new one; put the new link in `GOOGLE_CHAT_WEBHOOK_URL`. |
 | Chat messages stop | Admin → Google Chat → **Send a test message** says whether Google accepts them. The Render log says why one was dropped (it never shows the link). Messages that fail because Google is busy are retried twice. |
 

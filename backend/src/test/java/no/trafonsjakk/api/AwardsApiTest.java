@@ -257,7 +257,7 @@ class AwardsApiTest extends IntegrationTest {
             }
         }
         Integer rows = jdbc.queryForObject("select count(*) from monthly_awards where month = ?", Integer.class, m2.atDay(1));
-        assertThat(rows).isEqualTo(2);
+        assertThat(rows).as("one row per award").isEqualTo(3);
     }
 
     @Test

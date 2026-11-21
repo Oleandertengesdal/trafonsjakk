@@ -118,6 +118,7 @@ public class AccountService {
                   and not exists (select 1 from game_comments r where r.parent_id = c.id)""");
         jdbc.update("delete from game_kudos where user_id = ?", id);
         jdbc.update("delete from password_reset_tokens where user_id = ?", id);
+        jdbc.update("delete from push_subscriptions where user_id = ?", id);
         jdbc.update("update invite_codes set revoked_at = ? where created_by = ? and revoked_at is null", Timestamp.from(now), id);
         live.abandonAllFor(id, now);
         tokens.revokeAllForUser(id);

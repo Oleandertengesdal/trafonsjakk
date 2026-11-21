@@ -52,6 +52,7 @@ function LastMonth({ race }: { race: AwardRace }) {
   if (!pom.winner && pom.standings.length === 0) return null
   const leader: AwardStanding | undefined = pom.standings[0]?.qualified && pom.standings[0].overExpected > 0 ? pom.standings[0] : undefined
   const active = race.mostActive.winner
+  const accurate = race.mostAccurate.winner
 
   return (
     <section>
@@ -72,6 +73,9 @@ function LastMonth({ race }: { race: AwardRace }) {
               </div>
             </div>
             {active && <p className="mt-2 text-sm text-muted">{a.mostActiveLine(active.player.realName, t.common.games(active.games))}</p>}
+            {accurate && (
+              <p className="mt-1 text-sm text-muted">{a.mostAccurateLine(accurate.player.realName, f.pct((accurate.accuracy ?? 0) / 100))}</p>
+            )}
           </>
         ) : (
           <p className="mt-2 text-[0.9375rem] text-muted">{a.noWinner}</p>

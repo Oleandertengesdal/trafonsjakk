@@ -76,6 +76,14 @@ app:
     webhook-url: ${GOOGLE_CHAT_WEBHOOK_URL:}
     # Google Chat accepts about one message a second per space
     min-interval: 1100ms
+  push:
+    # Push notifications ("Ola logged a game against you"). A VAPID key pair: npx web-push generate-vapid-keys.
+    # The private key is a secret: environment variable only. Blank = no push notifications.
+    vapid-public-key: ${PUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:}
+    # A contact for the push services: mailto:… or https://… (default: APP_PUBLIC_URL)
+    subject: ${PUSH_SUBJECT:}
+    allow-local-endpoints: false
   games:
     auto-confirm-after: 48h
     # How far back a member may date a game they log. Admins have no limit (old games, corrections).

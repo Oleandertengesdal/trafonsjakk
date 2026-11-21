@@ -222,7 +222,12 @@ class SecurityApiTest extends IntegrationTest {
                 new Call("GET", "/api/live"), new Call("POST", "/api/live"), new Call("GET", "/api/live/1"),
                 new Call("PUT", "/api/live/1/moves"), new Call("POST", "/api/live/1/finish"),
                 new Call("POST", "/api/live/1/abandon"),
-                new Call("GET", "/api/users/me/export"), new Call("POST", "/api/users/me/delete"));
+                new Call("GET", "/api/users/me/export"), new Call("POST", "/api/users/me/delete"),
+                new Call("GET", "/api/games/1/analysis"), new Call("POST", "/api/games/1/analysis"),
+                new Call("GET", "/api/users/" + alice.username() + "/accuracy"), new Call("GET", "/api/analysis/calibration"),
+                new Call("GET", "/api/push/key"), new Call("POST", "/api/push/status"), new Call("POST", "/api/push/subscriptions"),
+                new Call("POST", "/api/push/subscriptions/remove"), new Call("POST", "/api/push/test"),
+                new Call("GET", "/api/openings/games"), new Call("GET", "/api/rivalry/a/b"));
     }
 
     private static List<Call> adminEndpoints() {
@@ -230,7 +235,7 @@ class SecurityApiTest extends IntegrationTest {
                 new Call("GET", "/api/admin/users"), new Call("PATCH", "/api/admin/users/1"),
                 new Call("POST", "/api/admin/users/1/password-reset"),
                 new Call("POST", "/api/admin/ratings/recompute"), new Call("GET", "/api/admin/chat"),
-                new Call("POST", "/api/admin/chat/test"));
+                new Call("POST", "/api/admin/chat/test"), new Call("DELETE", "/api/admin/games/1/analysis"));
     }
 
     private static Response call(ApiSession s, Call c) {
@@ -323,7 +328,7 @@ class SecurityApiTest extends IntegrationTest {
                 new Case("missing body", alice.api().raw("POST", "/api/games", "application/json", ""), 400),
                 new Case("JSON array instead of object", alice.api().raw("POST", "/api/games", "application/json", "[]"), 400),
                 new Case("unknown API path", alice.api().get("/api/nothing-here"), 404),
-                new Case("unknown enum", alice.api().post("/api/tournaments", Map.of("name", "x", "format", "SWISS",
+                new Case("unknown enum", alice.api().post("/api/tournaments", Map.of("name", "x", "format", "ARENA",
                         "participantIds", List.of())), 400),
                 new Case("playedAt not a date", alice.api().post("/api/games", Map.of("whiteId", alice.id(), "blackId", bob.id(),
                         "result", "DRAW", "playedAt", "yesterday")), 400));

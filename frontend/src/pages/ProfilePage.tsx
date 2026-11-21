@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Crown, Flame, Skull, Swords, Target, Trophy } from 'lucide-react'
-import { gamesApi, usersApi } from '../api/endpoints'
+import { analysisApi, gamesApi, usersApi } from '../api/endpoints'
 import type { Stats, Tally } from '../api/types'
 import { AwardBadges } from '../components/awards/AwardBadges'
 import { reviewYear } from '../components/year/season'
@@ -78,6 +78,11 @@ export function ProfilePage() {
             {t.year.profileLink(reviewYear().year)}
           </Link>
         )}
+        {played && (
+          <Link to={`/openings?player=${encodeURIComponent(p.username)}`} className="text-[0.9375rem] font-medium text-accent hover:underline">
+            {pr.openingsLink}
+          </Link>
+        )}
       </div>
 
       {!played ? (
@@ -107,11 +112,14 @@ export function ProfilePage() {
             <HighlightsPanel stats={s} />
           </div>
 
-          <Panel title={pr.gamesPerMonth}>
-            <div className="px-3 pt-1 pb-3">
-              <ActivityBars activity={s.activity} />
-            </div>
-          </Panel>
+          <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+            <Panel title={pr.gamesPerMonth}>
+              <div className="px-3 pt-1 pb-3">
+                <ActivityBars activity={s.activity} />
+              </div>
+            </Panel>
+            <AccuracyPanel username={p.username} />
+          </div>
         </>
       )}
 
@@ -140,6 +148,40 @@ export function ProfilePage() {
         )}
       </Panel>
     </div>
+  )
+}
+
+/** Average engine accuracy over the analysed, confirmed games, and the best-played one. */
+function AccuracyPanel({ username }: { username: string }) {
+  const { t, f } = useI18n()
+  const pr = t.profile
+  const q = useQuery({ queryKey: ['accuracy', username], queryFn: () => analysisApi.player(username) })
+  return (
+    <Panel title={pr.accuracy} className="flex flex-col">
+      <div className="flex flex-1 flex-col gap-4 px-5 pt-3 pb-5">
+        {q.isPending ? (
+          <Skeleton className="h-16" />
+        ) : q.isError ? (
+          <ErrorNotice error={q.error} onRetry={() => q.refetch()} />
+        ) : q.data.average === null || !q.data.best ? (
+          <p className="text-[0.9375rem] text-muted">{pr.noAccuracy}</p>
+        ) : (
+          <>
+            <div>
+              <p className="font-display text-[2.5rem] leading-none font-bold tabular-nums">{f.pct(q.data.average / 100)}</p>
+              <p className="mt-1.5 text-[0.9375rem] text-muted">{pr.accuracyOver(q.data.games)}</p>
+            </div>
+            <div className="mt-auto border-t border-line pt-4 text-[0.9375rem]">
+              <p className="text-muted">{pr.bestGame}</p>
+              <Link to={`/games/${q.data.best.gameId}`} className="mt-0.5 flex items-baseline justify-between gap-3 hover:text-accent">
+                <span className="min-w-0 truncate">{pr.bestGameAgainst(q.data.best.opponent.realName, f.date(q.data.best.playedAt))}</span>
+                <span className="font-display font-semibold tabular-nums">{f.pct(q.data.best.accuracy / 100)}</span>
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+    </Panel>
   )
 }
 
@@ -271,7 +313,11 @@ function HeadToHeadPanel({ stats: s }: { stats: Stats }) {
           {s.headToHead.map((h) => (
             <tr key={h.opponent.id} className="border-t border-line">
               <td className="px-5 py-2.5">
-                <Link to={`/players/${h.opponent.username}`} className="flex items-center gap-2.5 hover:text-accent">
+                <Link
+                  to={`/rivalry/${encodeURIComponent(s.player.username)}/${encodeURIComponent(h.opponent.username)}`}
+                  title={pr.rivalryHint(h.opponent.realName)}
+                  className="flex items-center gap-2.5 hover:text-accent"
+                >
                   <Avatar name={h.opponent.realName} seed={h.opponent.username} size="sm" />
                   <span className="truncate">{h.opponent.realName}</span>
                 </Link>

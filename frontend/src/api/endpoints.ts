@@ -1,8 +1,10 @@
-import { api, json } from './client'
+import type { ExplorerGame } from '../chess/explorer'
+import { api, ApiError, json } from './client'
 import type {
   AdminUser,
   Award,
   AwardRace,
+  Calibration,
   CommentLikes,
   CreatedInvite,
   Game,
@@ -18,10 +20,14 @@ import type {
   Me,
   MyMatch,
   Page,
+  PlayerAccuracy,
   PlayerRef,
   PlayerYear,
   Profile,
+  Rivalry,
   Role,
+  SavedAnalysis,
+  SavedEval,
   Stats,
   TournamentDetail,
   TournamentFormat,
@@ -90,6 +96,40 @@ export const gamesApi = {
     api<Game>(`/api/games/${id}/moves`, { method: 'PATCH', body: json({ moves }) }),
 }
 
+export const analysisApi = {
+  /** Null when nobody has analysed the game yet. */
+  get: (gameId: number) =>
+    api<SavedAnalysis>(`/api/games/${gameId}/analysis`).catch((e: unknown) => {
+      if (e instanceof ApiError && e.status === 404 && e.code === 'analysis.not_found') return null
+      throw e
+    }),
+  /** Saves it unless someone was first; returns the one that's kept. */
+  save: (gameId: number, depth: number, evals: SavedEval[]) =>
+    api<SavedAnalysis>(`/api/games/${gameId}/analysis`, { method: 'POST', body: json({ depth, evals }) }),
+  forget: (gameId: number) => api<void>(`/api/admin/games/${gameId}/analysis`, { method: 'DELETE' }),
+  player: (username: string) => api<PlayerAccuracy>(`/api/users/${encodeURIComponent(username)}/accuracy`),
+  calibration: () => api<Calibration>('/api/analysis/calibration'),
+}
+
+export const pushApi = {
+  /** Null when push notifications are off on the server. */
+  key: () => api<{ publicKey: string | null }>('/api/push/key'),
+  status: (endpoint: string) => api<{ subscribed: boolean }>('/api/push/status', { method: 'POST', body: json({ endpoint }) }),
+  subscribe: (sub: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+    api<void>('/api/push/subscriptions', { method: 'POST', body: json(sub) }),
+  unsubscribe: (endpoint: string) => api<void>('/api/push/subscriptions/remove', { method: 'POST', body: json({ endpoint }) }),
+  test: () => api<{ sent: number }>('/api/push/test', { method: 'POST' }),
+}
+
+export const openingsApi = {
+  /** Confirmed games with their first moves (at most 30 half-moves) or a typed opening name. */
+  games: (player?: string) => api<ExplorerGame[]>(`/api/openings/games${player ? `?player=${encodeURIComponent(player)}` : ''}`),
+}
+
+export const rivalryApi = {
+  get: (a: string, b: string) => api<Rivalry>(`/api/rivalry/${encodeURIComponent(a)}/${encodeURIComponent(b)}`),
+}
+
 export const socialApi = {
   comments: (gameId: number) => api<GameComment[]>(`/api/games/${gameId}/comments`),
   addComment: (gameId: number, body: string, parentId?: number) =>
@@ -126,7 +166,7 @@ export const yearApi = {
 export const tournamentsApi = {
   list: () => api<TournamentSummary[]>('/api/tournaments'),
   get: (id: number) => api<TournamentDetail>(`/api/tournaments/${id}`),
-  create: (body: { name: string; format: TournamentFormat; doubleRoundRobin: boolean; participantIds: number[] }) =>
+  create: (body: { name: string; format: TournamentFormat; doubleRoundRobin: boolean; participantIds: number[]; rounds?: number }) =>
     api<TournamentDetail>('/api/tournaments', { method: 'POST', body: json(body) }),
   setParticipants: (id: number, participantIds: number[]) =>
     api<TournamentDetail>(`/api/tournaments/${id}/participants`, { method: 'PUT', body: json({ participantIds }) }),

@@ -1,7 +1,9 @@
 // Replays a game on a board: step through with buttons, arrow keys or by tapping a move. With "Analyse"
-// on, one Stockfish in the browser first reviews the game (marks, graph, accuracy) and then thinks about
-// the position on the board, and you can try your own moves. Loaded lazily (chess.js and the board).
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react'
+// on, the game's review (marks, graph, accuracy) comes from the server if someone has analysed it before;
+// otherwise one Stockfish in the browser reviews it and saves the result for everyone. Then the engine
+// thinks about the position on the board, and you can try your own moves. Loaded lazily (chess.js, the board).
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Chess, type Square } from 'chess.js'
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, FlipVertical2, X } from 'lucide-react'
 import {
@@ -15,6 +17,9 @@ import {
   winPercent,
   type GameReview,
 } from '../../chess/analysis'
+import { analysisApi } from '../../api/endpoints'
+import type { Calibration } from '../../api/types'
+import { DEPTH } from '../../chess/engine'
 import { moveSquares, moveStats, parseMoves } from '../../chess/moves'
 import { ARROW_DEPTH, useAnalysisMode, useStockfish } from '../../chess/useStockfish'
 import { useI18n } from '../../i18n/I18nProvider'
@@ -27,6 +32,8 @@ import { glyphColour } from './judgement'
 import { MoveList } from './MoveList'
 
 export interface GameViewerProps {
+  /** The game, for its saved analysis; without it the review stays in this browser. */
+  gameId?: number
   moves: string
   orientation: 'white' | 'black'
   whiteName: string
@@ -45,7 +52,7 @@ function numbered(ply: number, san: string) {
 
 type Line = { from: number; moves: { san: string; uci: string }[] }
 
-export default function GameViewer({ moves, orientation, whiteName, blackName }: GameViewerProps) {
+export default function GameViewer({ gameId, moves, orientation, whiteName, blackName }: GameViewerProps) {
   const { t } = useI18n()
   const v = t.viewer
   const e = t.engine
@@ -68,8 +75,43 @@ export default function GameViewer({ moves, orientation, whiteName, blackName }:
 
   const [analysing, toggleAnalysis] = useAnalysisMode()
   const on = analysing && parsed.ok
-  const engine = useStockfish({ enabled: on, fen: shown && !finished ? shown.fen : null, review: parsed.ok ? sans : undefined })
-  const evals = on ? engine.evals : null
+  // The saved review, if any. undefined while asking; null when there's none (or the server can't say)
+  const saved = useQuery({
+    queryKey: ['analysis', gameId],
+    queryFn: () => analysisApi.get(gameId!),
+    enabled: on && gameId !== undefined,
+    staleTime: Infinity,
+    retry: 1,
+  })
+  const known =
+    gameId === undefined || saved.isError
+      ? null
+      : saved.data === undefined
+        ? undefined
+        : saved.data && saved.data.evals.length === sans.length + 1
+          ? saved.data.evals
+          : null
+  const asked = known !== undefined
+  const engine = useStockfish({
+    enabled: on,
+    fen: asked && shown && !finished ? shown.fen : null,
+    review: parsed.ok && asked && !known ? sans : undefined,
+  })
+  const evals = on ? (known ?? engine.evals) : null
+
+  // Reviewed here first: save it, so nobody has to do it again
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: (ev: NonNullable<typeof engine.evals>) => analysisApi.save(gameId!, DEPTH, ev),
+    onSuccess: (a) => queryClient.setQueryData(['analysis', gameId], a),
+  })
+  const sent = useRef(false)
+  useEffect(() => {
+    if (on && gameId !== undefined && asked && known === null && !saved.isError && engine.evals && !sent.current) {
+      sent.current = true
+      save.mutate(engine.evals)
+    }
+  }, [on, gameId, asked, known, saved.isError, engine.evals, save])
   const review = useMemo(() => (evals && parsed.ok ? reviewGame(sans, evals) : null), [evals, sans, parsed.ok])
 
   const go = useCallback(
@@ -296,9 +338,11 @@ function MoveComment({ review, ply }: { review: GameReview; ply: number }) {
 function Accuracy({ review, whiteName, blackName }: { review: GameReview; whiteName: string; blackName: string }) {
   const { t, f } = useI18n()
   const a = t.analysis
+  const calibration = useQuery({ queryKey: ['analysisCalibration'], queryFn: analysisApi.calibration, staleTime: 10 * 60_000 })
+  const fitted: Calibration | undefined = calibration.data?.slope != null ? calibration.data : undefined
   const rows = [
-    { name: whiteName, side: review.white, rating: playedLike(review.white) },
-    { name: blackName, side: review.black, rating: playedLike(review.black) },
+    { name: whiteName, side: review.white, rating: playedLike(review.white, fitted) },
+    { name: blackName, side: review.black, rating: playedLike(review.black, fitted) },
   ]
   const estimates = rows.some((r) => r.rating !== null)
   const marks = (s: GameReview['white']) =>
@@ -353,7 +397,9 @@ function Accuracy({ review, whiteName, blackName }: { review: GameReview; whiteN
           ))}
         </tbody>
       </table>
-      {estimates && <p className="mt-1.5 text-[0.75rem] text-muted">{a.playedLikeNote}</p>}
+      {estimates && (
+        <p className="mt-1.5 text-[0.75rem] text-muted">{fitted ? a.playedLikeGroupNote(fitted.samples) : a.playedLikeNote}</p>
+      )}
       <p className="mt-1.5 text-[0.75rem] text-faint">
         {a.accuracy}. {a.credit},{' '}
         <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noreferrer" className="underline hover:text-accent">

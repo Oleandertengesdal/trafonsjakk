@@ -28,7 +28,7 @@ public final class YearReviewCalculator {
                           double whiteExpected, int kudos, int comments, boolean hasMoves) {
     }
 
-    public enum AwardKind { PLAYER_OF_MONTH, MOST_ACTIVE }
+    public enum AwardKind { PLAYER_OF_MONTH, MOST_ACTIVE, MOST_ACCURATE }
 
     public record AwardRow(YearMonth month, AwardKind kind, long userId) {
     }
@@ -334,7 +334,9 @@ public final class YearReviewCalculator {
 
         Map<Long, int[]> awardCounts = new HashMap<>();
         for (AwardRow a : awards) {
-            awardCounts.computeIfAbsent(a.userId(), k -> new int[2])[a.kind() == AwardKind.PLAYER_OF_MONTH ? 0 : 1]++;
+            if (a.kind() != AwardKind.MOST_ACCURATE) {
+                awardCounts.computeIfAbsent(a.userId(), k -> new int[2])[a.kind() == AwardKind.PLAYER_OF_MONTH ? 0 : 1]++;
+            }
         }
         List<AwardLeader> leaders = awardCounts.entrySet().stream()
                 .map(e -> new AwardLeader(e.getKey(), e.getValue()[0], e.getValue()[1]))

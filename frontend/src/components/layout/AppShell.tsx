@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound, WifiOff } from 'lucide-react'
+import { BookOpen, House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound, WifiOff } from 'lucide-react'
 import { gamesApi } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthProvider'
 import { useI18n } from '../../i18n/I18nProvider'
@@ -34,6 +34,7 @@ export function AppShell() {
     { to: '/leaderboard', label: t.nav.ratings, icon: TrendingUp },
     { to: '/tournaments', label: t.nav.tournaments, icon: Trophy },
     { to: '/live', label: t.nav.live, icon: Radio },
+    { to: '/openings', label: t.nav.openings, icon: BookOpen },
   ]
   const secondaryNav: NavItem[] = [
     { to: `/players/${me.username}`, label: t.nav.myProfile, icon: UserRound },

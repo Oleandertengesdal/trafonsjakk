@@ -74,7 +74,7 @@ describe('analysing a game', () => {
     vi.mocked(Engine.load).mockReset()
     vi.mocked(analysisApi.get).mockReset().mockResolvedValue(null)
     vi.mocked(analysisApi.save).mockReset().mockImplementation(async (_id, _depth, evals) => saved(evals))
-    vi.mocked(analysisApi.calibration).mockReset().mockResolvedValue({ samples: 3, minSamples: 30, intercept: null, slope: null })
+    vi.mocked(analysisApi.calibration).mockReset().mockResolvedValue({ samples: 3, minSamples: 30, intercept: null, slope: null, low: null, high: null })
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, top: 0, left: 0, bottom: 40, right: 40, width: 40, height: 40, toJSON: () => ({}),
     } as DOMRect)

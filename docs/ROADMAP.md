@@ -132,6 +132,7 @@ Security review (November 2026, after going live):
 - Opening explorer: the group's openings as a move tree with results (transpositions merged), per player and colour, the games behind each line, and the most played openings by name (lichess's open opening list).
 - Push notifications: members can turn them on per device in Settings and get "Ola logged a game against you" when a game waits for their confirmation (Web Push, encrypted, no third-party library).
 - Google Chat: a message in the group's Chat space when a live game starts (with a link to follow it) and when a game is logged, the result in the same thread as the live game. Optional; admins can send a test message.
+- "Played like" fixed: it showed club players as ≈2400–2600 after an easy win. The estimate is now measured on 432 rated online games analysed exactly like here (the rating that players who play that accurately usually have), so it stays between about 1200 and 1850 and says so; on the group's own scale it never goes above the best or below the lowest rating in the group. The same measurement confirmed the accuracy itself (lichess's formula, stable from depth 8 to 18), so it is unchanged.
 - Player of the month: a monthly award for the most points over expectation (and one for the most games), decided 3 days after the month ends, with badges on the profile, this month's race on the home page and the full standings and earlier winners on the ratings page.
 
 ## Later ideas

@@ -168,25 +168,31 @@ describe('reviewGame', () => {
 })
 
 describe('playedLike', () => {
-  it('turns accuracy into a rough rating, to the nearest 50', () => {
-    expect(playedLike({ accuracy: 75, moves: 30 })).toBe(1200)
-    expect(playedLike({ accuracy: 82, moves: 30 })).toBe(1550)
-    expect(playedLike({ accuracy: 90, moves: 30 })).toBe(2000)
+  it('turns accuracy into the rating such players usually have, to the nearest 50', () => {
+    expect(playedLike({ accuracy: 75, moves: 30 })).toBe(1450)
+    expect(playedLike({ accuracy: 82, moves: 30 })).toBe(1600)
+    expect(playedLike({ accuracy: 90, moves: 30 })).toBe(1700)
   })
 
-  it('rises with accuracy and stays between 400 and 2800', () => {
+  it('rises with accuracy but stays near the middle: one game is weak evidence', () => {
     const ratings = [0, 30, 50, 55, 65, 72, 78, 83, 88, 93, 96, 98, 99.5, 100].map((accuracy) => playedLike({ accuracy, moves: 40 })!)
     expect(ratings).toEqual([...ratings].sort((a, b) => a - b))
-    expect(ratings[0]).toBe(400)
-    expect(ratings.at(-1)).toBe(2800)
+    expect(ratings[0]).toBe(1200)
+    expect(ratings.at(-1)).toBe(1850)
     expect(ratings.every((r) => r % 50 === 0)).toBe(true)
+    // A near-perfect game used to read as a grandmaster
+    expect(playedLike({ accuracy: 97, moves: 40 })!).toBeLessThan(1900)
   })
 
-  it('uses the group’s own scale once it has been fitted', () => {
+  it('uses the group’s own scale once it has been fitted, within the group’s ratings', () => {
     const fitted = { intercept: 200, slope: 15 }
     expect(playedLike({ accuracy: 80, moves: 30 }, fitted)).toBe(1400)
     expect(playedLike({ accuracy: 10, moves: 30 }, fitted)).toBe(400)
-    expect(playedLike({ accuracy: 80, moves: 30 }, { intercept: null, slope: null })).toBe(1450)
+    expect(playedLike({ accuracy: 80, moves: 30 }, { intercept: null, slope: null })).toBe(1550)
+    const group = { intercept: -1500, slope: 40, low: 1320, high: 1710 }
+    expect(playedLike({ accuracy: 75, moves: 30 }, group)).toBe(1500)
+    expect(playedLike({ accuracy: 99, moves: 30 }, group), 'not above the best in the group').toBe(1700)
+    expect(playedLike({ accuracy: 40, moves: 30 }, group), 'not below the lowest').toBe(1300)
   })
 
   it('gives no estimate for a short game', () => {

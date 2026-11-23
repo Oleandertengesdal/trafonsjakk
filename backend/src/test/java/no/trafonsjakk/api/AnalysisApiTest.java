@@ -214,6 +214,8 @@ class AnalysisApiTest extends IntegrationTest {
         assertThat(c.path("samples").asInt()).isEqualTo(2);
         assertThat(c.path("minSamples").asInt()).isEqualTo(30);
         assertThat(c.path("slope").isNull()).isTrue();
+        assertThat(c.path("low").isNull()).isTrue();
+        assertThat(c.path("high").isNull()).isTrue();
     }
 
     @Test

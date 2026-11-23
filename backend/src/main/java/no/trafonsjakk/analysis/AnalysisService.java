@@ -74,9 +74,15 @@ public class AnalysisService {
 
     /**
      * Rating ≈ intercept + slope × accuracy, fitted to the group's analysed games (each player's rating before
-     * the game). Null until there are {@code minSamples} samples and accuracy actually goes with rating.
+     * the game): the rating that players here who play that accurately usually have. Kept between {@code low}
+     * and {@code high}, the lowest and highest rating in the samples, so a near-perfect game never reads as
+     * stronger than anyone in the group. All four are null until there are {@code minSamples} samples and
+     * accuracy actually goes with rating.
      */
-    public record CalibrationDto(int samples, int minSamples, Double intercept, Double slope) {
+    public record CalibrationDto(int samples, int minSamples, Double intercept, Double slope, Double low, Double high) {
+        static CalibrationDto none(int samples) {
+            return new CalibrationDto(samples, CALIBRATION_MIN, null, null, null, null);
+        }
     }
 
     private final AnalysisRepository analyses;
@@ -183,17 +189,24 @@ public class AnalysisService {
         return calibrate(samples);
     }
 
-    /** Least squares of rating on accuracy. */
+    /**
+     * Least squares of rating on accuracy, the rating that goes with an accuracy (not the other way round: one
+     * game's accuracy says little, and this fit knows it, so its estimates stay near the group's middle).
+     */
     static CalibrationDto calibrate(List<double[]> samples) {
         int n = samples.size();
         if (n < CALIBRATION_MIN) {
-            return new CalibrationDto(n, CALIBRATION_MIN, null, null);
+            return CalibrationDto.none(n);
         }
         double mx = 0;
         double my = 0;
+        double low = Double.POSITIVE_INFINITY;
+        double high = Double.NEGATIVE_INFINITY;
         for (double[] s : samples) {
             mx += s[0];
             my += s[1];
+            low = Math.min(low, s[1]);
+            high = Math.max(high, s[1]);
         }
         mx /= n;
         my /= n;
@@ -204,10 +217,10 @@ public class AnalysisService {
             sxy += (s[0] - mx) * (s[1] - my);
         }
         if (sxx < 1e-9 || sxy <= 0) {
-            return new CalibrationDto(n, CALIBRATION_MIN, null, null);
+            return CalibrationDto.none(n);
         }
         double slope = sxy / sxx;
-        return new CalibrationDto(n, CALIBRATION_MIN, my - slope * mx, slope);
+        return new CalibrationDto(n, CALIBRATION_MIN, my - slope * mx, slope, low, high);
     }
 
     private Game game(long id) {

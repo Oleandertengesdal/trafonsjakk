@@ -291,12 +291,17 @@ export interface PlayerAccuracy {
   recent: GameAccuracy[]
 }
 
-/** "Played like" fitted to the group's ratings: rating ≈ intercept + slope × accuracy. Null until enough games. */
+/**
+ * "Played like" fitted to the group's ratings: rating ≈ intercept + slope × accuracy, kept between `low` and
+ * `high` (the lowest and highest rating in the fit). All null until enough games.
+ */
 export interface Calibration {
   samples: number
   minSamples: number
   intercept: number | null
   slope: number | null
+  low: number | null
+  high: number | null
 }
 
 export interface LeaderboardRow {

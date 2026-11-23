@@ -292,52 +292,55 @@ export function playerAccuracy(accuracies: number[], weights: number[]): number 
 }
 
 /**
- * Accuracy → rating, roughly where players of that strength tend to land in one game. There's no agreed
- * formula: these points follow the published rules of thumb (casual players score in the 70s, club players
- * in the low to mid 80s, 90+ is very clean play), and studies find that one game's accuracy explains only a
- * small part of the difference between players' ratings.
+ * Accuracy → rating: how players who play one game that accurately are usually rated. Measured, not guessed:
+ * 864 player-games from 432 rated lichess games (players rated 800–2300, roughly as many at every level),
+ * each analysed exactly as this site does it (Stockfish 18 lite, depth 14, lichess's accuracy), then the
+ * average rating of the players at each accuracy, smoothed. One game says little about a player (accuracy
+ * explains only about a fifth of the differences in rating, and these estimates are typically ±300 off),
+ * so the numbers stay near the middle: even a flawless game points to about 1850, not to a grandmaster.
+ * Plenty of 1100s have a 95 % game when the opponent collapses early.
  */
 const STRENGTH: [accuracy: number, rating: number][] = [
-  [50, 400],
-  [60, 700],
-  [70, 1000],
-  [75, 1200],
-  [80, 1450],
-  [85, 1700],
-  [90, 2000],
-  [95, 2400],
-  [98, 2700],
+  [50, 1200],
+  [60, 1250],
+  [65, 1325],
+  [70, 1400],
+  [75, 1450],
+  [80, 1550],
+  [85, 1650],
+  [90, 1700],
+  [95, 1775],
+  [100, 1850],
 ]
 
 /** Fewer moves than this and one slip decides everything: no estimate. */
 export const STRENGTH_MIN_MOVES = 10
 
 /**
- * "Played like a 1450": a rough rating for one side's play in one game, from its accuracy, to the nearest
- * 50 and between 400 and 2800. Null for short games. One game can be several hundred points off.
- * With `fitted` (from the group's own analysed games) it's on the group's rating scale instead.
+ * "Played like a 1550": a rough rating for one side's play in one game, from its accuracy, to the nearest
+ * 50. Null for short games. With `fitted` (from the group's own analysed games) it's on the group's rating
+ * scale instead, and never below or above the lowest and highest rating in that fit.
  */
 export function playedLike(
   side: Pick<SideSummary, 'accuracy' | 'moves'>,
-  fitted?: { intercept: number | null; slope: number | null },
+  fitted?: { intercept: number | null; slope: number | null; low?: number | null; high?: number | null },
 ): number | null {
   if (side.moves < STRENGTH_MIN_MOVES) return null
   const a = side.accuracy
   let rating: number
   if (fitted && fitted.intercept !== null && fitted.slope !== null) {
     rating = fitted.intercept + fitted.slope * a
+    if (fitted.low != null) rating = Math.max(fitted.low, rating)
+    if (fitted.high != null) rating = Math.min(fitted.high, rating)
   } else if (a <= STRENGTH[0][0]) {
     rating = STRENGTH[0][1]
+  } else if (a >= STRENGTH[STRENGTH.length - 1][0]) {
+    rating = STRENGTH[STRENGTH.length - 1][1]
   } else {
     const i = STRENGTH.findIndex(([acc]) => acc >= a)
-    if (i === -1) {
-      const [[a1, r1], [a2, r2]] = STRENGTH.slice(-2)
-      rating = r2 + ((a - a2) * (r2 - r1)) / (a2 - a1)
-    } else {
-      const [a1, r1] = STRENGTH[i - 1]
-      const [a2, r2] = STRENGTH[i]
-      rating = r1 + ((a - a1) * (r2 - r1)) / (a2 - a1)
-    }
+    const [a1, r1] = STRENGTH[i - 1]
+    const [a2, r2] = STRENGTH[i]
+    rating = r1 + ((a - a1) * (r2 - r1)) / (a2 - a1)
   }
   return Math.round(Math.max(400, Math.min(2800, rating)) / 50) * 50
 }

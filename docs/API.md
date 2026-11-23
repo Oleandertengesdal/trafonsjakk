@@ -182,10 +182,10 @@ Eval            { score: { cp } | { mate, by: "w"|"b" },   // from White's side;
 Analysis        { gameId, depth, evals: Eval[], white: { moves, accuracy }, black: { moves, accuracy }, analysedAt }
 PlayerAccuracy  { games, average: number | null, best: GameAccuracy | null, recent: GameAccuracy[] }  // recent: last 30, oldest first
 GameAccuracy    { gameId, accuracy, colour: "WHITE"|"BLACK", result, opponent: PlayerRef, playedAt }
-Calibration     { samples, minSamples: 30, intercept: number | null, slope: number | null }
+Calibration     { samples, minSamples: 30, intercept: number | null, slope: number | null, low: number | null, high: number | null }
 ```
 
-Accuracy is lichess's *game accuracy* (0–100), the same formula as the website. Changing a game's moves deletes its analysis. `Calibration` is a least-squares fit of each player's rating before the game on their accuracy in it, over analysed confirmed games with at least 10 of their moves; `intercept` and `slope` stay null until there are `minSamples` samples and higher accuracy actually goes with a higher rating.
+Accuracy is lichess's *game accuracy* (0–100), the same formula as the website. Changing a game's moves deletes its analysis. `Calibration` is a least-squares fit of each player's rating before the game on their accuracy in it, over analysed confirmed games with at least 10 of their moves; `low` and `high` are the lowest and highest rating among the samples; the website keeps an estimate between them, so a near-perfect game never reads as stronger than anyone in the group. All four stay null until there are `minSamples` samples and higher accuracy actually goes with a higher rating.
 
 ## Rivalries
 

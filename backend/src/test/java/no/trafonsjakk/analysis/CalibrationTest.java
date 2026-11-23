@@ -22,6 +22,8 @@ class CalibrationTest {
         assertThat(c.samples()).isEqualTo(40);
         assertThat(c.slope()).isCloseTo(15, within(0.5));
         assertThat(c.intercept() + c.slope() * 80).isCloseTo(1600, within(20.0));
+        assertThat(c.low()).as("lowest rating in the samples").isEqualTo(400 + 15 * 61 - 30);
+        assertThat(c.high()).as("highest rating in the samples").isEqualTo(400 + 15 * 98 + 30);
 
         assertThat(AnalysisService.calibrate(samples.subList(0, 29)).slope()).as("too few").isNull();
     }
@@ -33,6 +35,7 @@ class CalibrationTest {
             samples.add(new double[] {60 + i, 2000 - 10.0 * i});
         }
         assertThat(AnalysisService.calibrate(samples).slope()).isNull();
+        assertThat(AnalysisService.calibrate(samples).high()).isNull();
         List<double[]> same = new ArrayList<>();
         for (int i = 0; i < 40; i++) {
             same.add(new double[] {80, 1500 + i});

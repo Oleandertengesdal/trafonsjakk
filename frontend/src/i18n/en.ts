@@ -861,7 +861,7 @@ export const en = {
     clean: 'No mistakes',
     playedLike: 'Played like',
     playedLikeNote:
-      'The ≈ number under the accuracy is a rough rating: how strong the play in this one game looked. One game can be several hundred points off, so it says more about the game than about the player.',
+      'The ≈ number under the accuracy is how players who play one game this accurately are usually rated (measured on rated online games). One game says little, so the number stays near the middle and can still be 300 points off either way.',
     playedLikeGroupNote: (n: number) =>
       `The ≈ number under the accuracy is a rating on the group’s own scale: how players here who play this accurately are usually rated, fitted to ${n} analysed games. One game can still be far off.`,
     judgement: { blunder: 'Blunder', mistake: 'Mistake', inaccuracy: 'Inaccuracy' },

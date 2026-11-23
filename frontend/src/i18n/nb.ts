@@ -855,7 +855,7 @@ export const nb: Dict = {
     clean: 'Ingen feil',
     playedLike: 'Spilte som',
     playedLikeNote:
-      'Tallet med ≈ under nøyaktigheten er en grov rating: hvor sterkt spillet i akkurat dette partiet var. Ett parti kan bomme med flere hundre poeng, så det sier mer om partiet enn om spilleren.',
+      'Tallet med ≈ under nøyaktigheten viser hvilken rating spillere som spiller ett parti så presist, pleier å ha (målt på ratede partier på nett). Ett parti sier lite, så tallet holder seg nær midten, og det kan likevel bomme med 300 poeng begge veier.',
     playedLikeGroupNote: (n) =>
       `Tallet med ≈ under nøyaktigheten er en rating på gruppas egen skala: hvilken rating spillere her som spiller så presist pleier å ha, tilpasset ${n} analyserte partier. Ett parti kan fortsatt bomme mye.`,
     judgement: { blunder: 'Tabbe', mistake: 'Feil', inaccuracy: 'Unøyaktighet' },

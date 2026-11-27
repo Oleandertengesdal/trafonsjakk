@@ -69,13 +69,20 @@ function Section({ title, items }: { title: string; items: TournamentSummary[] }
                   {x.status === 'COMPLETED' ? <Crown aria-hidden className="mt-1 size-5" /> : <Trophy aria-hidden className="mt-1 size-5" />}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{x.name}</p>
-                  <p className="truncate text-[0.8125rem] text-muted">
+                  <p className="font-medium break-words">{x.name}</p>
+                  <p className="text-[0.8125rem] text-muted">
                     {t.tournaments.meta(
                       x.doubleRoundRobin ? `${t.format[x.format]} (${t.format.double})` : t.format[x.format],
                       t.common.players(x.participantCount),
                       x.createdBy.realName,
                     )}
+                  </p>
+                  {/* Phones: the status and date column on the right doesn't fit, so it goes here */}
+                  <p className="text-[0.8125rem] sm:hidden">
+                    <span className={cn(x.status === 'IN_PROGRESS' ? 'text-win' : x.status === 'REGISTRATION' ? 'text-gold' : 'text-muted')}>
+                      {x.winner ? t.tournaments.wonBy(x.winner.realName) : t.tournamentStatus[x.status]}
+                    </span>
+                    <span className="text-faint">, {f.date(x.completedAt ?? x.startedAt ?? x.createdAt)}</span>
                   </p>
                 </div>
                 <div className="hidden text-right text-[0.8125rem] sm:block">

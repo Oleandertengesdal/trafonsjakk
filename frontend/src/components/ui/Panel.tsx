@@ -12,7 +12,7 @@ export function Panel({
   return (
     <section className={cn('overflow-hidden rounded-panel border border-line bg-surface shadow-[0_1px_0_rgb(0_0_0/0.03)]', className)} {...rest}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 px-5 pt-4 pb-1">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 pt-4 pb-1">
           {title && <h2 className="font-display text-[1.0625rem] font-semibold tracking-[-0.01em]">{title}</h2>}
           {action}
         </header>

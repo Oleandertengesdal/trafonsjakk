@@ -30,7 +30,7 @@ walk(en, nb, 'dict')
 
 // Same strings in both languages usually means a forgotten translation.
 // Words that are genuinely the same in Norwegian and English.
-const allowedSame = new Set(['Trafonsjakk', 'Admin', 'Format', 'Rating', 'Score', 'Form', 'ECO', 'Norsk', 'English', 'Kudos', 'Google Chat', 'Buchholz'])
+const allowedSame = new Set(['Trafonsjakk', 'Admin', 'Format', 'Rating', 'Score', 'Form', 'ECO', 'Norsk', 'English', 'Kudos', 'Google Chat', 'Buchholz', 'BH'])
 function sameText(a: unknown, b: unknown, path: string) {
   if (typeof a === 'string' && a === b && a.length > 3 && !allowedSame.has(a)) {
     console.warn(`! ${path}: identical in en and nb ("${a}")`)

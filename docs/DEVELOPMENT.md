@@ -66,7 +66,7 @@ CI runs all of this plus a gitleaks secret scan on every push (`.github/workflow
 
 | Kind | Where | Needs |
 |---|---|---|
-| Unit tests (Glicko-2, pairings, bracket, standings, stats, monthly award rules, year in review, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,award,review,game,auth,common}` | nothing |
+| Unit tests (Glicko-2, pairings, bracket, standings, stats, monthly award rules, year in review, chess rules with perft, the online clock, small domain rules) | `src/test/java/no/trafonsjakk/{rating,tournament,stats,award,review,chess,online,game,auth,common}` | nothing |
 | API tests: the real app on a random port, called over HTTP with cookies and CSRF like the browser | `src/test/java/no/trafonsjakk/api` | PostgreSQL |
 
 The API tests use the `test` profile (`src/test/resources/application-test.yml`). They run in their own schema, `trafonsjakk_test`, inside the Docker database, so they never touch your dev data, and they empty all tables before each test. Point them elsewhere with `TEST_DATABASE_URL` / `TEST_DATABASE_USERNAME` / `TEST_DATABASE_PASSWORD`.
@@ -84,6 +84,7 @@ If the database isn't running, the API tests are **skipped** with a hint, so `mv
 | `InputLimitsApiTest` | every field limit on both sides of the boundary |
 | `ConcurrencyApiTest` | requests fired in parallel (double clicks, two tabs, two people) |
 | `TournamentInvariantsApiTest` | whole tournaments of 2–32 players with seeded random results |
+| `OnlineGameApiTest` | online play: challenges, moves checked by the server, the clock (timeouts, late moves, cancelling), every ending, casual and daily games, the online rating |
 
 To add one, extend `support/IntegrationTest`. It gives you `registerAdmin()`, `registerMember(...)`, `bulkUsers(n, prefix)` (fast inserts) with `login(id)`, `game(...)`, `playConfirmed(...)`, `rating(...)` and a `jdbc` template for setting up time-based cases (for example, backdating `created_at` to test auto-confirm). `support/Race` starts several requests at the same instant; `support/Jwts` mints tokens for attack tests.
 

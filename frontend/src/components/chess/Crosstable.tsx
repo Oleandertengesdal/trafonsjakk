@@ -44,10 +44,10 @@ export function Crosstable({ standings, matches }: { standings: Standing[]; matc
             return (
               <tr key={row.player.id}>
                 <td className="border-t border-line px-3 py-2.5 text-muted tabular-nums">{row.rank}</td>
-                <td className="border-t border-line px-3 py-2.5">
+                <td className="w-full max-w-0 border-t border-line px-3 py-2.5 md:w-auto md:max-w-none">
                   <Link to={`/players/${row.player.username}`} className="flex items-center gap-2.5 hover:text-accent">
                     <Avatar name={row.player.realName} seed={row.player.username} size="sm" />
-                    <span className="truncate font-medium">{row.player.realName}</span>
+                    <span className="min-w-0 font-medium break-words">{row.player.realName}</span>
                   </Link>
                 </td>
                 {standings.map((col, ci) => {

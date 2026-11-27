@@ -30,6 +30,8 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ de
 const YearPage = lazy(() => import('./pages/YearPage').then((m) => ({ default: m.YearPage })))
 const LivePage = lazy(() => import('./pages/LivePage').then((m) => ({ default: m.LivePage })))
 const LiveGamePage = lazy(() => import('./pages/LiveGamePage').then((m) => ({ default: m.LiveGamePage })))
+const PlayPage = lazy(() => import('./pages/PlayPage').then((m) => ({ default: m.PlayPage })))
+const OnlineGamePage = lazy(() => import('./pages/OnlineGamePage').then((m) => ({ default: m.OnlineGamePage })))
 const TvPage = lazy(() => import('./pages/TvPage').then((m) => ({ default: m.TvPage })))
 const RivalryPage = lazy(() => import('./pages/RivalryPage').then((m) => ({ default: m.RivalryPage })))
 const OpeningsPage = lazy(() => import('./pages/OpeningsPage').then((m) => ({ default: m.OpeningsPage })))
@@ -73,6 +75,8 @@ export function App() {
                     <Route path="games/:id" element={page(<GameDetailPage />)} />
                     <Route path="live" element={page(<LivePage />)} />
                     <Route path="live/:id" element={page(<LiveGamePage />)} />
+                    <Route path="play" element={page(<PlayPage />)} />
+                    <Route path="play/:id" element={page(<OnlineGamePage />)} />
                     <Route path="leaderboard" element={<LeaderboardPage />} />
                     <Route path="openings" element={page(<OpeningsPage />)} />
                     <Route path="rivalry/:a/:b" element={page(<RivalryPage />)} />

@@ -79,6 +79,10 @@ erDiagram
     USERS ||--o{ PUSH_SUBSCRIPTIONS : "gets notifications on"
     USERS ||--o{ LIVE_GAMES : plays
     LIVE_GAMES |o--o| GAMES : "becomes"
+    USERS ||--o{ ONLINE_CHALLENGES : "challenges"
+    ONLINE_CHALLENGES |o--o| ONLINE_GAMES : "starts"
+    USERS ||--o{ ONLINE_GAMES : plays
+    ONLINE_GAMES |o--o| GAMES : "becomes (rated)"
 
     USERS {
         bigint id PK
@@ -93,6 +97,7 @@ erDiagram
         int rated_games
         float peak_rating
         timestamptz last_game_at
+        float online_rating "online pool (cache), also _deviation, _volatility, _rated_games, _peak_rating, _last_game_at"
         timestamptz deleted_at "set when the person deleted their account"
     }
     GAMES {
@@ -109,6 +114,8 @@ erDiagram
         text notes
         text moves "PGN / SAN"
         bigint tournament_match_id FK "nullable"
+        varchar mode "OTB | ONLINE"
+        varchar time_control "online: 10+5, 3d"
     }
     RATING_HISTORY {
         bigint id PK
@@ -120,6 +127,7 @@ erDiagram
         float rd_after
         float volatility_after
         timestamptz played_at
+        varchar pool "OTB | ONLINE"
     }
     INVITE_CODES {
         bigint id PK
@@ -205,6 +213,37 @@ erDiagram
         timestamptz started_at
         timestamptz updated_at
     }
+    ONLINE_CHALLENGES {
+        bigint id PK
+        bigint created_by FK
+        bigint opponent_id FK "null = open to anyone"
+        varchar colour "WHITE | BLACK | RANDOM (the creator's)"
+        boolean rated
+        varchar kind "LIVE | DAILY"
+        int initial_seconds
+        int increment_seconds
+        int days_per_move
+        varchar status "OPEN | ACCEPTED | DECLINED | CANCELLED"
+        timestamptz expires_at
+    }
+    ONLINE_GAMES {
+        bigint id PK
+        bigint white_id FK
+        bigint black_id FK
+        boolean rated
+        varchar kind "LIVE | DAILY, with the clock settings"
+        varchar status "ACTIVE | FINISHED | ABORTED"
+        varchar result
+        varchar end_reason
+        text moves "checked move by move"
+        int plies
+        bigint white_ms "time left when the turn started"
+        bigint black_ms
+        timestamptz turn_started_at
+        bigint draw_offer_by FK
+        bigint game_id FK "the confirmed game, if rated"
+        bigint version
+    }
     REFRESH_TOKENS {
         bigint id PK
         bigint user_id FK
@@ -256,7 +295,7 @@ erDiagram
 | `monthly_awards` rows are written once and never updated | A decided month stays decided, even if an old game is corrected later (see §3.7). |
 | Indexes on `(white_id, played_at)`, `(black_id, played_at)`, `(status, created_at)`, `(user_id, played_at)` on history | Profile pages, auto-confirm sweep and rating graphs are all index scans. |
 
-The full DDL is in the Flyway migrations: [`V1__init.sql`](../backend/src/main/resources/db/migration/V1__init.sql) (core tables), `V2` (multi-use invites, password links, comments, kudos), `V3` (comment replies and likes) and `V4` (monthly awards).
+The full DDL is in the Flyway migrations: [`V1__init.sql`](../backend/src/main/resources/db/migration/V1__init.sql) (core tables), `V2` (multi-use invites, password links, comments, kudos), `V3` (comment replies and likes), `V4` (monthly awards) and `V10` (online play: challenges, online games, `games.mode`, the online rating).
 
 ---
 
@@ -290,6 +329,9 @@ no.trafonsjakk
 ├── user/          User, Role, PlayerRef, UserRepository, UserService, UserController
 │                  (profile and statistics endpoints), AccountService (your data, deleting)
 ├── live/          LiveGame(+Repository), LiveGameService, LiveGameController, LiveDtos
+├── chess/         Position (rules, legal moves, SAN, FEN), ChessGame (a game and how the board ends it), Move, Color
+├── online/        TimeControl, Clock, Ending (pure), OnlineChallenge, OnlineGame (+Repositories),
+│                  OnlineGameService, OnlineGameController, OnlineDtos
 ├── game/          Game, GameResult, GameStatus, GameRepository, GameService, GameMapper,
 │                  GameController, AutoConfirmService, GameContextService
 ├── social/        GameComment(+Repository), CommentLikeRepository, KudosRepository,
@@ -308,7 +350,7 @@ no.trafonsjakk
 └── admin/         AdminController, ChatAdminController
 ```
 
-Algorithm classes (`Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`, `YearReviewCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
+Algorithm classes (`Position`, `ChessGame`, `Clock`, `Glicko2`, `RoundRobinScheduler`, `KnockoutBracket`, `StandingsCalculator`, `PlayerStatsCalculator`, `MonthlyAwardCalculator`, `YearReviewCalculator`) are plain Java with no Spring or JPA imports. They're easy to unit test and easy to reason about.
 
 ### 3.3 Game lifecycle (opponent confirmation)
 
@@ -356,6 +398,8 @@ stateDiagram-v2
 6. Convert back: `r′ = 173.7178 μ′ + 1500`, `RD′ = 173.7178 φ′`.
 
 The implementation is verified against the worked example in Glickman's paper (1500/200/0.06 vs three opponents → 1464.06 / 151.52 / 0.05999).
+
+**Two pools.** Over-the-board and online games (`games.mode`) are rated separately with the same rules: each game moves only its own pool, and its `rating_history` rows carry the pool. Both are rebuilt in the same replay, in order of play. Before a player's first online game their online rating is set to their over-the-board rating at that moment, with its RD (grown by inactivity) but at least 200, so it starts in the right place and still moves quickly. Everything else (statistics, head-to-head, rivalries, monthly awards, the year in review) counts both kinds of games, each with the expected score from its own pool; the rating graph, the year in review's rating line and the climbers use the over-the-board pool.
 
 **Recompute, don't patch.** Whenever the set of confirmed games changes (confirm, auto-confirm, admin correction, void), `RatingService.recomputeAll()`:
 
@@ -433,6 +477,14 @@ Three awards per calendar month (Norwegian time), from confirmed games only:
 
 Spectators get a live analysis view (`LiveSpectator`, loaded lazily): the board follows the game, they can step back through the moves (and jump back to the live position, with a count of the moves they missed), and they can switch on **Analyse**. The engine (the same in-browser Stockfish and the same parts as the game analysis: `useStockfish`, `AnalysisBoard`, `EnginePanel`) searches whatever position is on the board to depth 18 with three lines (MultiPV), reporting as it deepens; a new move or stepping back stops the old search and starts a new one. The page shows an evaluation bar, an arrow for the best move and the three best continuations. **Fair play:** the players (and anyone recording the game) never get this view during the game, and the TV shows no evaluation, since players can see it. This is a guard in the interface, not a lock: a player could still open the page logged in as someone else.
 
+### 3.9a Online play
+
+Games played on the site (`online` package), refereed by the server. **Rules:** `chess.Position` is a small dependency-free move generator (mailbox board, pseudo-legal moves filtered by "is my king attacked afterwards", castling through check refused, en passant, promotion) with SAN and FEN; `PerftTest` checks it against the published perft counts of six positions (one wrong legal move anywhere changes the count). `ChessGame` replays the stored score sheet and ends the game on checkmate, stalemate, insufficient material, threefold repetition (positions compared with castling rights, and en passant only when it can actually be played) and the fifty-move rule.
+
+**Clock** (`Clock`, pure and immutable): stored as each side's time left when the current turn started, plus when it started; nothing ticks. Live games: thinking time comes off the bank and the increment is added; each side's first move is free but must come within 60 s, or the game is cancelled. The server measures from when it stored the opponent's move, which includes the move's way to the phone and back, so the phone sends its own thinking time; the server charges that, but never less than its own measure minus 1.5 s. A flag counts only once those 1.5 s have also gone by, so a move made in time that's still on its way is never beaten by a spectator's poll. Daily games: each move has a deadline, the days don't accumulate.
+
+**Flow.** A challenge (to a member or open) is accepted with the row locked (one accept wins); both players are locked with an advisory lock and their old games settled before "one clock game at a time" is checked. Every command runs with the game row locked and first *settles* it (cancels or ends it on time if due), committing that even when the command itself is then refused, so a move that arrives too late loses on time. A move carries the ply it was made on, so a double tap or a retry is refused rather than played twice. Pages poll; a game whose time is up ends on the next read, the next lobby, or within a minute (scheduler). A rated game with a result is stored through `GameService.recordOnline` as a confirmed game (no confirmation needed: the server saw it) and the ratings are recomputed. No Chat messages; push notifications for challenges and daily "your move".
+
 ### 3.9b Google Chat messages (optional)
 
 With `GOOGLE_CHAT_WEBHOOK_URL` set, the API posts to a Google Chat space through its incoming webhook. `LiveGameService.start` and `GameService.create` publish `LiveGameStarted` / `GameLogged` events; `ChatNotifications` handles them with `@TransactionalEventListener`, so a message is only sent once the change has been committed (a refused request announces nothing). The text (Norwegian, names escaped) comes from `ChatMessages`; the link to the site uses `APP_PUBLIC_URL` and is left out without it. Each message has a `threadKey`: `live-<id>` for a live game and for the game it turns into, so the result is a reply under the start, otherwise `game-<id>`. Games dated more than 3 days back aren't announced.
@@ -504,6 +556,8 @@ On the frontend:
 | `/tournaments/:id` | Standings & fixtures (RR) or bracket (KO) | member |
 | `/invites` | Create / revoke invite codes | member |
 | `/live` | Games being played now, start a live game, link to TV mode | member |
+| `/play` | Online play: challenges to and from you, your games (your move first), the challenge form, open challenges, games to watch, your recent games | member |
+| `/play/:id` | An online game: the board for the players, clocks, draw offers, resign, cancel, rematch; spectators watch. No engine. | member |
 | `/live/:id` | A player records the moves on the board (saved after every move) and taps the result. Spectators follow the board, step back through the moves, and can switch on live Stockfish analysis. Keeps the screen on. | member |
 | `/tv` | TV mode: full-screen, read-only scoreboard (live boards, ratings, latest results), always dark, keeps the screen on. Outside the app's navigation. | member |
 | `/settings` | Real name, password, language, light/dark, download your data, delete your account | member |
@@ -527,7 +581,8 @@ src/
 │   │                            Crosstable, Bracket, PlayerSelect, MoveRecorder, GameMoves,
 │   │                            GameViewer (replay + move statistics), GameContextPanel,
 │   │                            GameComments, KudosButton, EvalGraph/EvalBar, AnalysisBoard, EnginePanel,
-│   │                            MoveList (engine analysis, shared by the game page and live games)
+│   │                            MoveList (engine analysis, shared by the game page and live games),
+│   │                            PlayBoard (the online board: tap or drag, legal squares, promotion)
 │   ├── awards/                  MonthlyAwardCard (home), AwardsPanel (ratings page), AwardBadges (profile)
 │   ├── year/                    StoryViewer, StoryCard, player and group slides, shareCard (card → PNG),
 │   │                            YearBanner (home, December–January)
@@ -540,7 +595,8 @@ src/
 ├── pages/                       one file per route
 ├── i18n/                        en.ts, nb.ts (dictionaries), I18nProvider, format.ts (locale-aware
 │                                dates/numbers), rounds.ts, useErrorText.ts (server error codes → text)
-└── lib/                         cn.ts, theme.ts, gameResult.ts, safePath.ts, contact.ts
+└── lib/                         cn.ts, theme.ts, gameResult.ts, safePath.ts, contact.ts, onlineClock.ts
+                                 (the online clock as shown: counting down between polls, presets)
 ```
 
 ### 4.4 Engine analysis (Stockfish in the browser)

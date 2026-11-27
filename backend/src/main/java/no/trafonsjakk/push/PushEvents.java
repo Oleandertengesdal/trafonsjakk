@@ -13,4 +13,12 @@ public final class PushEvents {
     public record ConfirmationNeeded(long gameId, List<Long> recipients, String reporter, String white, String black,
                                      GameResult result) {
     }
+
+    /** {@code recipient} was challenged to an online game ({@code timeControl}: "10+5", "3d"). */
+    public record ChallengeReceived(long challengeId, long recipient, String challenger, String timeControl, boolean rated) {
+    }
+
+    /** It's {@code recipient}'s turn in a daily game (live games are played with the page open, so no message). */
+    public record YourMove(long onlineGameId, long recipient, String opponent, String lastMove) {
+    }
 }

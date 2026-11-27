@@ -20,7 +20,7 @@ const sizes: Record<Size, string> = {
 }
 
 const base =
-  'inline-flex select-none items-center justify-center rounded-control font-medium transition-[transform,background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex select-none items-center justify-center whitespace-nowrap rounded-control font-medium transition-[transform,background-color,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-50'
 
 function buttonClass(variant: Variant = 'primary', size: Size = 'md', className?: string) {
   return cn(base, variants[variant], sizes[size], className)

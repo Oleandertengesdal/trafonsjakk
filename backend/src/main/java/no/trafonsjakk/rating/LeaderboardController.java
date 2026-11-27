@@ -2,8 +2,10 @@ package no.trafonsjakk.rating;
 
 import java.util.List;
 import no.trafonsjakk.game.AutoConfirmService;
+import no.trafonsjakk.game.GameMode;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -19,8 +21,8 @@ public class LeaderboardController {
     }
 
     @GetMapping
-    List<LeaderboardService.Row> get() {
+    List<LeaderboardService.Row> get(@RequestParam(defaultValue = "OTB") GameMode pool) {
         autoConfirm.sweepIfDue();
-        return leaderboard.leaderboard();
+        return leaderboard.leaderboard(pool);
     }
 }

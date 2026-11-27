@@ -61,6 +61,22 @@ public class User {
     @Column(name = "last_game_at", insertable = false, updatable = false)
     private Instant lastGameAt;
 
+    // The online rating, a separate pool with the same rules (V10)
+    @Column(name = "online_rating", insertable = false, updatable = false)
+    private double onlineRating = Glicko2.DEFAULT_RATING;
+
+    @Column(name = "online_rating_deviation", insertable = false, updatable = false)
+    private double onlineRatingDeviation = Glicko2.DEFAULT_RD;
+
+    @Column(name = "online_rated_games", insertable = false, updatable = false)
+    private int onlineRatedGames;
+
+    @Column(name = "online_peak_rating", insertable = false, updatable = false)
+    private double onlinePeakRating = Glicko2.DEFAULT_RATING;
+
+    @Column(name = "online_last_game_at", insertable = false, updatable = false)
+    private Instant onlineLastGameAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -180,5 +196,29 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public double getOnlineRating() {
+        return onlineRating;
+    }
+
+    public double getOnlineRatingDeviation() {
+        return onlineRatingDeviation;
+    }
+
+    public int getOnlineRatedGames() {
+        return onlineRatedGames;
+    }
+
+    public double getOnlinePeakRating() {
+        return onlinePeakRating;
+    }
+
+    public Instant getOnlineLastGameAt() {
+        return onlineLastGameAt;
+    }
+
+    public boolean isOnlineProvisional() {
+        return onlineRatingDeviation > Glicko2.PROVISIONAL_RD;
     }
 }

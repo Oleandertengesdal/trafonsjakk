@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Trophy, Zap } from 'lucide-react'
+import { Swords, Trophy, Zap } from 'lucide-react'
 import { gamesApi } from '../api/endpoints'
 import type { PlayerRef, RatingDelta as Delta } from '../api/types'
 import { useAuth } from '../auth/AuthProvider'
@@ -48,6 +48,11 @@ export function GameDetailPage() {
       </div>
 
       <section className="rounded-t-[2.5rem] rounded-b-panel border border-line bg-surface px-5 py-8 sm:px-8">
+        {g.mode === 'ONLINE' && (
+          <p className="mb-6 flex items-center justify-center gap-2 text-[0.9375rem] text-muted">
+            <Swords aria-hidden className="size-4" /> {t.play.playedOnline(g.timeControl ?? '')}
+          </p>
+        )}
         {g.tournament && (
           <Link to={`/tournaments/${g.tournament.id}`} className="mb-6 flex items-center justify-center gap-2 text-[0.9375rem] text-accent hover:underline">
             <Trophy aria-hidden className="size-4" /> {d.tournamentRound(g.tournament.name, g.tournament.round)}
@@ -110,12 +115,18 @@ export function GameDetailPage() {
 
       <Panel title={d.details}>
         <dl className="grid gap-x-6 gap-y-4 px-5 pt-2 pb-5 sm:grid-cols-2">
-          <Detail label={d.loggedBy}>
-            {g.reportedBy.realName}, {f.dateTime(g.createdAt)}
-          </Detail>
-          <Detail label={d.confirmed}>
-            {g.confirmedAt ? `${g.confirmedBy ? g.confirmedBy.realName : d.automatically}, ${f.dateTime(g.confirmedAt)}` : d.notYet}
-          </Detail>
+          {g.mode === 'ONLINE' ? (
+            <Detail label={d.confirmed}>{t.play.playedOnline(g.timeControl ?? '')}, {f.dateTime(g.playedAt)}</Detail>
+          ) : (
+            <>
+              <Detail label={d.loggedBy}>
+                {g.reportedBy.realName}, {f.dateTime(g.createdAt)}
+              </Detail>
+              <Detail label={d.confirmed}>
+                {g.confirmedAt ? `${g.confirmedBy ? g.confirmedBy.realName : d.automatically}, ${f.dateTime(g.confirmedAt)}` : d.notYet}
+              </Detail>
+            </>
+          )}
           {(g.opening || g.eco) && (
             <Detail label={d.opening}>
               {g.opening}

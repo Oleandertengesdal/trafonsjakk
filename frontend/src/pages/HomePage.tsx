@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Swords, Trophy } from 'lucide-react'
-import { gamesApi, leaderboardApi, liveApi, tournamentsApi, usersApi } from '../api/endpoints'
+import { gamesApi, leaderboardApi, liveApi, onlineApi, tournamentsApi, usersApi } from '../api/endpoints'
 import { useAuth } from '../auth/AuthProvider'
 import { MonthlyAwardCard } from '../components/awards/MonthlyAwardCard'
 import { YearBanner } from '../components/year/YearBanner'
@@ -28,9 +28,19 @@ export function HomePage() {
   const stats = useQuery({ queryKey: ['stats', me!.username], queryFn: () => usersApi.stats(me!.username) })
   const pending = useQuery({ queryKey: ['pending'], queryFn: gamesApi.pending })
   const myMatches = useQuery({ queryKey: ['myMatches'], queryFn: tournamentsApi.myMatches })
-  const board = useQuery({ queryKey: ['leaderboard'], queryFn: leaderboardApi.get })
+  const board = useQuery({ queryKey: ['leaderboard'], queryFn: () => leaderboardApi.get() })
   const recent = useQuery({ queryKey: ['games', 'recent'], queryFn: () => gamesApi.list({ size: 8 }) })
   const live = useQuery({ queryKey: ['live'], queryFn: liveApi.running, refetchInterval: 30_000 })
+  const lobby = useQuery({ queryKey: ['online', 'lobby'], queryFn: onlineApi.lobby, refetchInterval: 30_000 })
+  const onlineWaiting = [
+    ...(lobby.data?.challengesToMe ?? []).map((c) => ({ key: `c${c.id}`, to: '/play', text: t.play.challengedYou(c.createdBy.realName), detail: c.timeControl.label })),
+    ...(lobby.data?.myTurn ?? []).map((g) => ({
+      key: `g${g.id}`,
+      to: `/play/${g.id}`,
+      text: `${t.play.yourMove}: ${g.white.realName} ${t.play.vs} ${g.black.realName}`,
+      detail: g.timeControl.label,
+    })),
+  ]
 
   const firstName = me!.realName.split(' ')[0]
   const s = stats.data
@@ -57,7 +67,7 @@ export function HomePage() {
             {s && (
               <p className="mt-3 text-[0.9375rem] text-on-accent/85">
                 {s.player.rank ? t.home.ranked(s.player.rank) : t.home.provisional}
-                {s.totals.games > 0 && `. ${t.home.ratedGames(s.totals.games)}`}
+                {s.player.ratedGames > 0 && `. ${t.home.ratedGames(s.player.ratedGames)}`}
               </p>
             )}
           </div>
@@ -113,24 +123,40 @@ export function HomePage() {
         </Panel>
       )}
 
+      {onlineWaiting.length > 0 && (
+        <Panel title={t.play.title} className="border-gold/50">
+          <ul className="divide-y divide-line">
+            {onlineWaiting.map((w) => (
+              <li key={w.key}>
+                <Link to={w.to} className="flex items-center gap-3 px-5 py-3 font-medium hover:text-accent">
+                  <Swords aria-hidden className="size-4 shrink-0 text-muted" />
+                  <span className="min-w-0 flex-1 break-words">{w.text}</span>
+                  <span className="text-[0.8125rem] font-normal text-muted tabular-nums">{w.detail}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
       {(myMatches.data?.length ?? 0) > 0 && (
         <Panel title={t.home.toPlayTitle}>
           <ul className="divide-y divide-line">
             {myMatches.data!.map((m) => {
               const opponent = m.white.id === me!.id ? m.black : m.white
               return (
-                <li key={m.matchId} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                  <div className="flex min-w-0 items-center gap-3">
+                <li key={m.matchId} className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-5 py-3.5">
+                  <div className="flex min-w-[min(100%,14rem)] flex-1 items-center gap-3">
                     <Swords aria-hidden className="size-4.5 shrink-0 text-muted" />
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{t.home.versus(opponent.realName)}</p>
-                      <p className="truncate text-[0.8125rem] text-muted">
+                      <p className="font-medium break-words">{t.home.versus(opponent.realName)}</p>
+                      <p className="text-[0.8125rem] text-muted break-words">
                         {m.tournamentName}, {roundName(t, m.format, m.round, m.totalRounds)}
                         {m.needsReplay && <span className="text-gold">, {t.home.replayAfterDraw}</span>}
                       </p>
                     </div>
                   </div>
-                  <ButtonLink to={`/log?match=${m.matchId}`} variant="secondary" size="sm" className="shrink-0">
+                  <ButtonLink to={`/log?match=${m.matchId}`} variant="secondary" size="sm" className="ml-auto shrink-0">
                     {t.home.logResult}
                   </ButtonLink>
                 </li>
@@ -222,7 +248,7 @@ function ActiveTournaments() {
             <Link to={`/tournaments/${x.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-raised/70">
               <Trophy aria-hidden className="size-5 shrink-0 text-accent" />
               <div className="min-w-0">
-                <p className="truncate font-medium">{x.name}</p>
+                <p className="font-medium break-words">{x.name}</p>
                 <p className="text-[0.8125rem] text-muted">
                   {t.format[x.format]}, {t.common.players(x.participantCount)}. {t.tournamentStatus[x.status]}
                 </p>

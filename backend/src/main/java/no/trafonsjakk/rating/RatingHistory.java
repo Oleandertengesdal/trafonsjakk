@@ -40,6 +40,10 @@ public class RatingHistory {
     @Column(name = "played_at", nullable = false)
     private Instant playedAt;
 
+    /** "OTB" or "ONLINE": which rating this row belongs to (the game's mode). */
+    @Column(nullable = false, length = 10)
+    private String pool;
+
     protected RatingHistory() {
     }
 
@@ -73,5 +77,9 @@ public class RatingHistory {
 
     public Instant getPlayedAt() {
         return playedAt;
+    }
+
+    public boolean online() {
+        return "ONLINE".equals(pool);
     }
 }

@@ -33,7 +33,7 @@ class YearReviewCalculatorTest {
         rating.put(white, wa);
         rating.put(black, ba);
         GameRow g = new GameRow(nextId++, d.atTime(18, 0).toInstant(ZoneOffset.UTC), d, white, black, whiteScore, opening,
-                wb, wa, bb, ba, exp, kudos, comments, moves);
+                wb, wa, bb, ba, exp, kudos, comments, moves, false);
         games.add(g);
         return g;
     }
@@ -202,6 +202,36 @@ class YearReviewCalculatorTest {
         assertThat(y.topRivalry().games()).isEqualTo(3);   // 1 and 2
         assertThat(y.topRivalry().aWins()).isGreaterThanOrEqualTo(y.topRivalry().bWins());
         assertThat(y.longestWinStreak().length()).isEqualTo(2); // 3: won, lost, won, won
+    }
+
+    /** An online game: its ratings are the online pool's (here a made-up 1800 line), not the over-the-board ones. */
+    private void playOnline(String date, long white, long black, double whiteScore) {
+        LocalDate d = LocalDate.parse(date);
+        games.add(new GameRow(nextId++, d.atTime(20, 0).toInstant(ZoneOffset.UTC), d, white, black, whiteScore, null,
+                1800, 1800 + 30 * whiteScore, 1800, 1800 - 30 * whiteScore, 0.5, 0, 0, true, true));
+    }
+
+    @Test
+    void theRatingLineIsOverTheBoardButOnlineGamesStillCount() {
+        play("2026-03-01", 1, 2, 1, 0.5, null, 0, 0, false);  // 1: 1500 -> 1510
+        playOnline("2026-12-20", 1, 2, 1);
+        PlayerYear p = YearReviewCalculator.player(1, games, List.of());
+        assertThat(p.games()).isEqualTo(2);
+        assertThat(p.wins()).isEqualTo(2);
+        assertThat(p.ratingStart()).isEqualTo(1500);
+        assertThat(p.ratingEnd()).isEqualTo(1510);
+        assertThat(p.ratingPeak()).isEqualTo(1510);
+        assertThat(p.ratingByMonth()).extracting(m -> m.month().toString()).containsExactly("2026-03");
+        GroupYear g = YearReviewCalculator.group(games, List.of());
+        assertThat(g.climbers()).extracting(c -> c.change()).allMatch(c -> Math.abs(c) == 10);
+    }
+
+    @Test
+    void someoneWhoOnlyPlayedOnlineGetsTheOnlineLine() {
+        playOnline("2026-12-20", 3, 4, 1);
+        PlayerYear p = YearReviewCalculator.player(3, games, List.of());
+        assertThat(p.ratingStart()).isEqualTo(1800);
+        assertThat(p.ratingEnd()).isEqualTo(1830);
     }
 
     @Test

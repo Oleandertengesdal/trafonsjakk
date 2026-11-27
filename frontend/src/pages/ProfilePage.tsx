@@ -1,9 +1,9 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Crown, Flame, Skull, Swords, Target, Trophy } from 'lucide-react'
 import { analysisApi, gamesApi, usersApi } from '../api/endpoints'
-import type { Stats, Tally } from '../api/types'
+import type { GameMode, Stats, Tally } from '../api/types'
 import { AwardBadges } from '../components/awards/AwardBadges'
 import { reviewYear } from '../components/year/season'
 import { ActivityBars } from '../components/chess/ActivityBars'
@@ -15,6 +15,7 @@ import { FormStrip } from '../components/chess/ResultMark'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorNotice } from '../components/ui/ErrorNotice'
 import { Panel } from '../components/ui/Panel'
+import { Segmented } from '../components/ui/Segmented'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useI18n } from '../i18n/I18nProvider'
 import { cn } from '../lib/cn'
@@ -68,6 +69,15 @@ export function ProfilePage() {
             <p className="font-display text-2xl font-semibold text-accent tabular-nums">{s.peakRating}</p>
             <p className="mt-1 text-[0.8125rem] text-faint">{pr.low(s.lowestRating)}</p>
           </div>
+          {p.online.games > 0 && (
+            <div className="border-l border-line pl-6">
+              <p className="text-[0.8125rem] text-muted">{p.online.rank ? pr.onlineRank(p.online.rank) : pr.onlineRating}</p>
+              <p className="font-display text-2xl font-semibold tabular-nums">
+                <Rating value={p.online.rating} provisional={p.online.provisional} />
+              </p>
+              <p className="mt-1 text-[0.8125rem] text-faint">{pr.onlineGames(p.online.games)}</p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -94,11 +104,7 @@ export function ProfilePage() {
       ) : (
         <>
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            <Panel title={pr.ratingOverTime}>
-              <div className="px-2 pt-2 pb-4 sm:px-4">
-                <RatingChart history={s.ratingHistory} memberSince={p.memberSince} />
-              </div>
-            </Panel>
+            <RatingPanel stats={s} />
             <RecordPanel stats={s} />
           </div>
 
@@ -174,7 +180,7 @@ function AccuracyPanel({ username }: { username: string }) {
             <div className="mt-auto border-t border-line pt-4 text-[0.9375rem]">
               <p className="text-muted">{pr.bestGame}</p>
               <Link to={`/games/${q.data.best.gameId}`} className="mt-0.5 flex items-baseline justify-between gap-3 hover:text-accent">
-                <span className="min-w-0 truncate">{pr.bestGameAgainst(q.data.best.opponent.realName, f.date(q.data.best.playedAt))}</span>
+                <span className="min-w-0 break-words">{pr.bestGameAgainst(q.data.best.opponent.realName, f.date(q.data.best.playedAt))}</span>
                 <span className="font-display font-semibold tabular-nums">{f.pct(q.data.best.accuracy / 100)}</span>
               </Link>
             </div>
@@ -312,14 +318,14 @@ function HeadToHeadPanel({ stats: s }: { stats: Stats }) {
         <tbody>
           {s.headToHead.map((h) => (
             <tr key={h.opponent.id} className="border-t border-line">
-              <td className="px-5 py-2.5">
+              <td className="w-full max-w-0 px-5 py-2.5">
                 <Link
                   to={`/rivalry/${encodeURIComponent(s.player.username)}/${encodeURIComponent(h.opponent.username)}`}
                   title={pr.rivalryHint(h.opponent.realName)}
                   className="flex items-center gap-2.5 hover:text-accent"
                 >
                   <Avatar name={h.opponent.realName} seed={h.opponent.username} size="sm" />
-                  <span className="truncate">{h.opponent.realName}</span>
+                  <span className="min-w-0 break-words">{h.opponent.realName}</span>
                 </Link>
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">{h.games}</td>
@@ -408,5 +414,47 @@ function ProfileSkeleton() {
         <Skeleton className="h-80 rounded-panel" />
       </div>
     </div>
+  )
+}
+
+/** The rating graph: over the board, or the online rating's own line for someone who has played online. */
+function RatingPanel({ stats }: { stats: Stats }) {
+  const { t } = useI18n()
+  const pr = t.profile
+  const hasOnline = stats.onlineRatingHistory.length > 0
+  const hasBoard = stats.ratingHistory.length > 0
+  const [pool, setPool] = useState<GameMode>(hasBoard || !hasOnline ? 'OTB' : 'ONLINE')
+  return (
+    <Panel
+      title={pr.ratingOverTime}
+      action={
+        hasOnline ? (
+          <div className="w-56">
+            <Segmented
+              label={pr.graphPool}
+              hideLabel
+              value={pool}
+              onChange={setPool}
+              options={[
+                { value: 'OTB', label: t.leaderboard.pools.OTB },
+                { value: 'ONLINE', label: t.leaderboard.pools.ONLINE },
+              ]}
+            />
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="px-2 pt-2 pb-4 sm:px-4">
+        {pool === 'ONLINE' ? (
+          <RatingChart
+            history={stats.onlineRatingHistory}
+            memberSince={stats.onlineRatingHistory[0]?.date ?? stats.player.memberSince}
+            startRating={stats.onlineStartRating ?? 1500}
+          />
+        ) : (
+          <RatingChart history={stats.ratingHistory} memberSince={stats.player.memberSince} />
+        )}
+      </div>
+    </Panel>
   )
 }

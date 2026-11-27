@@ -68,7 +68,9 @@ public final class GameDtos {
             int commentCount,
             int kudosCount,
             boolean kudosGivenByMe,
-            boolean canGiveKudos) {
+            boolean canGiveKudos,
+            GameMode mode,
+            String timeControl) {
     }
 
     /** Moves in PGN/SAN ("1. e4 e5 2. Nf3 …"), checked for legality in the app. Blank clears them. */

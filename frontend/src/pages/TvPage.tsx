@@ -25,7 +25,7 @@ export function TvPage() {
   const { t } = useI18n()
   const tv = t.tv
   const live = useQuery({ queryKey: ['live'], queryFn: liveApi.running, refetchInterval: 4_000 })
-  const board = useQuery({ queryKey: ['leaderboard'], queryFn: leaderboardApi.get, refetchInterval: 60_000 })
+  const board = useQuery({ queryKey: ['leaderboard'], queryFn: () => leaderboardApi.get(), refetchInterval: 60_000 })
   const recent = useQuery({
     queryKey: ['games', 'tv'],
     queryFn: () => gamesApi.list({ status: 'CONFIRMED', size: 6 }),

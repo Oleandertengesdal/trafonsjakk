@@ -7,11 +7,14 @@ import { useI18n } from '../../i18n/I18nProvider'
 type Point = Stats['ratingHistory'][number] & { idx: number }
 type TipPayload = readonly { payload?: unknown }[] | undefined
 
-/** Single-series rating line with a crosshair tooltip. One axis, recessive grid. */
-export function RatingChart({ history, memberSince }: { history: Stats['ratingHistory']; memberSince: string }) {
+/**
+ * Single-series rating line with a crosshair tooltip. One axis, recessive grid. The line starts at
+ * {@code startRating} (1500, where everyone starts; the online line starts from the over-the-board rating).
+ */
+export function RatingChart({ history, memberSince, startRating = 1500 }: { history: Stats['ratingHistory']; memberSince: string; startRating?: number }) {
   const { t, f } = useI18n()
   const data: Point[] = [
-    { date: memberSince, rating: 1500, rd: 350, gameId: null, opponent: null, result: null, idx: 0 },
+    { date: memberSince, rating: startRating, rd: 350, gameId: null, opponent: null, result: null, idx: 0 },
     ...history.map((h, i) => ({ ...h, idx: i + 1 })),
   ]
   const ratings = data.map((d) => d.rating)

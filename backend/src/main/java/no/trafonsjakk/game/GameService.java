@@ -263,6 +263,23 @@ public class GameService {
         return overdue.size();
     }
 
+    /**
+     * Stores a rated online game that has ended as an ordinary game. It is confirmed straight away: the
+     * server saw every move, so there is nothing for the opponent to check. Doesn't recompute the
+     * ratings; the caller does that once its own changes are in place (the recompute clears the
+     * persistence context). No chat or push message: online games are announced on the website itself.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public long recordOnline(long whiteId, long blackId, long reporterId, GameResult result, Instant playedAt,
+                             String moves, String timeControl) {
+        Game game = new Game(users.getReferenceById(whiteId), users.getReferenceById(blackId), result, playedAt,
+                users.getReferenceById(reporterId));
+        game.setMoves(moves);
+        game.playedOnline(timeControl);
+        game.confirm(null, playedAt);
+        return games.save(game).getId();
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
     private void afterConfirmedSetChanged(Game game) {
@@ -287,6 +304,9 @@ public class GameService {
         }
         if (!game.involves(actor.id()) && !actor.admin()) {
             throw ApiException.forbidden("game.not_a_player", "Only the players (or an admin) can add the moves");
+        }
+        if (game.getMode() == GameMode.ONLINE) {
+            throw ApiException.conflict("game.online_moves", "The moves of an online game are what was played");
         }
         String updated = moves == null || moves.isBlank() ? null : moves.trim();
         if (!java.util.Objects.equals(updated, game.getMoves())) {

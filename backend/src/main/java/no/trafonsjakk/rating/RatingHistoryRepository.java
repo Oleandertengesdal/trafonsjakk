@@ -10,6 +10,7 @@ public interface RatingHistoryRepository extends JpaRepository<RatingHistory, Lo
 
     List<RatingHistory> findByGameIdIn(Collection<Long> gameIds);
 
-    @Query("select h from RatingHistory h where h.userId = :userId order by h.playedAt asc, h.gameId asc")
-    List<RatingHistory> findForUser(@Param("userId") Long userId);
+    /** A player's history in one rating pool ("OTB" or "ONLINE"), oldest first. */
+    @Query("select h from RatingHistory h where h.userId = :userId and h.pool = :pool order by h.playedAt asc, h.gameId asc")
+    List<RatingHistory> findForUser(@Param("userId") Long userId, @Param("pool") String pool);
 }

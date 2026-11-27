@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, Trophy } from 'lucide-react'
 import { awardsApi, leaderboardApi } from '../api/endpoints'
@@ -10,6 +10,8 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorNotice } from '../components/ui/ErrorNotice'
 import { Panel } from '../components/ui/Panel'
+import { Segmented } from '../components/ui/Segmented'
+import type { GameMode } from '../api/types'
 import { SkeletonRows } from '../components/ui/Skeleton'
 import { signed } from '../i18n/format'
 import { useI18n } from '../i18n/I18nProvider'
@@ -18,7 +20,10 @@ import { cn } from '../lib/cn'
 export function LeaderboardPage() {
   const { t, f } = useI18n()
   const lb = t.leaderboard
-  const q = useQuery({ queryKey: ['leaderboard'], queryFn: leaderboardApi.get })
+  const [params, setParams] = useSearchParams()
+  const pool: GameMode = params.get('pool') === 'online' ? 'ONLINE' : 'OTB'
+  const online = pool === 'ONLINE'
+  const q = useQuery({ queryKey: online ? ['leaderboard', 'ONLINE'] : ['leaderboard'], queryFn: () => leaderboardApi.get(pool) })
   const awards = useQuery({ queryKey: ['awards', 'list', null], queryFn: () => awardsApi.list() })
   const reigning = awards.data?.find((w) => w.kind === 'PLAYER_OF_MONTH')
   const { hash } = useLocation()
@@ -30,14 +35,26 @@ export function LeaderboardPage() {
 
   return (
     <>
-      <PageHeader title={lb.title} description={lb.description} />
+      <PageHeader title={lb.title} description={online ? lb.onlineDescription : lb.description} />
+      <div className="mb-4 max-w-sm">
+        <Segmented
+          label={lb.pool}
+          hideLabel
+          value={pool}
+          onChange={(v) => setParams(v === 'ONLINE' ? { pool: 'online' } : {}, { replace: true })}
+          options={[
+            { value: 'OTB', label: lb.pools.OTB },
+            { value: 'ONLINE', label: lb.pools.ONLINE },
+          ]}
+        />
+      </div>
       <Panel>
         {q.isPending ? (
           <SkeletonRows rows={8} />
         ) : q.isError ? (
           <ErrorNotice error={q.error} onRetry={() => q.refetch()} />
         ) : q.data.length === 0 ? (
-          <EmptyState icon={<TrendingUp />} title={lb.empty} />
+          <EmptyState icon={<TrendingUp />} title={online ? lb.onlineEmpty : lb.empty} />
         ) : (
           <table className="w-full text-[0.9375rem]">
             <caption className="sr-only">{lb.caption}</caption>
@@ -59,13 +76,13 @@ export function LeaderboardPage() {
                 return (
                   <tr key={r.player.id} className={cn('border-t border-line', firstProvisional && 'border-t-2 border-t-faint/40')}>
                     <td className={cn('px-5 py-3 font-display font-semibold tabular-nums', r.rank === 1 ? 'text-accent' : 'text-faint')}>{r.rank ?? ''}</td>
-                    <td className="py-3">
+                    <td className="w-full max-w-0 py-3">
                       <Link to={`/players/${r.player.username}`} className="flex items-center gap-3 hover:text-accent">
                         <Avatar name={r.player.realName} seed={r.player.username} size="sm" />
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5 font-medium">
-                            <span className="truncate">{r.player.realName}</span>
-                            {reigning?.player.id === r.player.id && (
+                            <span className="min-w-0 break-words">{r.player.realName}</span>
+                            {!online && reigning?.player.id === r.player.id && (
                               <Trophy role="img" aria-label={t.awards.reigning(f.monthYear(reigning.month))} className="size-4 shrink-0 text-gold" />
                             )}
                           </span>
@@ -92,9 +109,11 @@ export function LeaderboardPage() {
           </table>
         )}
       </Panel>
-      <div className="mt-6">
-        <AwardsPanel />
-      </div>
+      {!online && (
+        <div className="mt-6">
+          <AwardsPanel />
+        </div>
+      )}
     </>
   )
 }

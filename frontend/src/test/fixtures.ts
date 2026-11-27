@@ -40,6 +40,8 @@ export function pendingGame(overrides: Partial<Game> = {}): Game {
     kudosCount: 0,
     kudosGivenByMe: false,
     canGiveKudos: false,
+    mode: 'OTB',
+    timeControl: null,
     ...overrides,
   }
 }

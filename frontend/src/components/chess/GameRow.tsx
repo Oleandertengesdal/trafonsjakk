@@ -21,7 +21,7 @@ export function GameRow({ game }: { game: Game }) {
     <li>
       <Link
         to={`/games/${game.id}`}
-        className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-3 transition-colors hover:bg-raised/70 sm:grid-cols-[4.5rem_1fr_auto_1fr_8rem] sm:gap-3 sm:px-5"
+        className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-3 transition-colors hover:bg-raised/70 sm:grid-cols-[4.5rem_1fr_auto_1fr_8rem] sm:gap-3 sm:px-5"
       >
         <span className="hidden text-sm text-muted sm:block">{f.shortDate(game.playedAt)}</span>
         <Side name={game.white.realName} seed={game.white.username} delta={rc?.white} winner={game.result === 'WHITE_WIN'} align="end" colourLabel={t.common.white} light />
@@ -46,7 +46,7 @@ export function GameRow({ game }: { game: Game }) {
         </span>
         <Side name={game.black.realName} seed={game.black.username} delta={rc?.black} winner={game.result === 'BLACK_WIN'} align="start" colourLabel={t.common.black} />
         <span className={cn('hidden text-right text-[0.8125rem] sm:block', statusTone[game.status])}>
-          {game.status === 'CONFIRMED' ? (game.tournament?.name ?? '') : t.gameStatus[game.status]}
+          {game.status === 'CONFIRMED' ? (game.tournament?.name ?? (game.mode === 'ONLINE' ? `${t.play.online} · ${game.timeControl ?? ''}` : '')) : t.gameStatus[game.status]}
         </span>
       </Link>
     </li>
@@ -76,9 +76,9 @@ function Side({
         <Avatar name={name} seed={seed} size="sm" />
       </span>
       <span className="min-w-0">
-        <span className={cn('flex items-center gap-1.5', align === 'end' && 'justify-end')}>
-          <span role="img" aria-label={colourLabel} className={cn('size-2 shrink-0 rounded-[2px] border border-faint', light ? 'bg-trim' : 'bg-roof')} />
-          <span className={cn('truncate text-[0.9375rem]', winner ? 'font-semibold text-ink' : 'text-ink/80')}>{name}</span>
+        <span className={cn('flex items-start gap-1.5', align === 'end' && 'justify-end')}>
+          <span role="img" aria-label={colourLabel} className={cn('mt-[0.45em] size-2 shrink-0 rounded-[2px] border border-faint', light ? 'bg-trim' : 'bg-roof')} />
+          <span className={cn('min-w-0 text-sm leading-snug break-words hyphens-auto sm:text-[0.9375rem]', winner ? 'font-semibold text-ink' : 'text-ink/80')}>{name}</span>
         </span>
         {delta && <RatingDelta before={delta.before} after={delta.after} className="block text-[0.8125rem]" />}
       </span>

@@ -99,8 +99,8 @@ export function AdminPage() {
                 <tr className="text-left text-[0.8125rem] text-muted">
                   <th scope="col" className="px-5 py-2 font-medium">{a.member}</th>
                   <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">{a.joined}</th>
-                  <th scope="col" className="px-3 py-2 text-right font-medium">{a.games}</th>
-                  <th scope="col" className="px-5 py-2 text-right font-medium">{a.access}</th>
+                  <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">{a.games}</th>
+                  <th scope="col" className="px-3 py-2 text-right font-medium sm:px-5">{a.access}</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,7 +108,7 @@ export function AdminPage() {
                   const pending = updateUser.isPending && updateUser.variables?.id === u.id
                   return (
                     <tr key={u.id} className="border-t border-line">
-                      <td className="px-5 py-3">
+                      <td className="w-full max-w-0 px-5 py-3 break-words">
                         <Link to={`/players/${u.username}`} className="font-medium hover:text-accent">
                           {u.realName}
                         </Link>
@@ -116,12 +116,15 @@ export function AdminPage() {
                           {u.username}
                           {u.role === 'ADMIN' && `, ${t.common.admin}`}
                           {u.deleted ? a.deletedSuffix : !u.enabled && a.disabledSuffix}
+                          {/* Phones: the games column doesn't fit */}
+                          <span className="sm:hidden">, {t.common.games(u.ratedGames)}</span>
                         </span>
                       </td>
                       <td className="hidden px-3 py-3 text-muted sm:table-cell">{f.date(u.createdAt)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{u.ratedGames}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex justify-end gap-2">
+                      <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{u.ratedGames}</td>
+                      <td className="px-3 py-3 sm:px-5">
+                        {/* Stacked on phones, so the actions fit beside the name */}
+                        <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:justify-end sm:gap-2">
                           {u.id === me!.id ? (
                             <span className="text-[0.8125rem] text-faint">{t.common.you}</span>
                           ) : u.deleted ? null : (

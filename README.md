@@ -1,6 +1,6 @@
 # Trafonsjakk
 
-Ratings, results and tournaments for a friend group's **over-the-board** chess. In Norwegian and English.
+Ratings, results and tournaments for a friend group's **over-the-board** chess, and online games against each other when you're apart. In Norwegian and English.
 
 Play on a real board, log the result in a few taps, and your opponent confirms it. Glicko-2 ratings, statistics and tournament tables update by themselves.
 
@@ -10,6 +10,7 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 
 - **Log a physical game** in seconds: opponent, colour, result, when. Opening and notes are optional.
 - **Record the moves** on a board (tap or drag, every move checked for legality, pawn promotion, undo) or type/paste them as `e4 e5 Nf3` or a whole PGN. Moves can also be added later from the game page.
+- **Play online:** challenge a friend (or post an open challenge) with a clock (3+2 up to 30+0) or as a daily game (1–7 days per move), rated or casual. The server checks every move and keeps the clock: increment, free first moves, network delay forgiven, out of time against a lone king is a draw. Resign, offer a draw, rematch; others can watch. Online games have **their own rating**, started from your over-the-board rating, with its own leaderboard tab and graph; rated games then count like any other game. Push notifications when you're challenged, and when it's your move in a daily game.
 - **Live games:** start a game when you sit down, record each move on a phone as you play (saved straight away), and tap the result at the end. Everyone else follows the board as it happens, can step back through the moves, and can switch on live Stockfish analysis (players don't get it during their own game). Moves stay optional.
 - **Push notifications (optional):** turn them on per device and get a notification when someone logs a game against you, so you can confirm it.
 - **Rivalry pages:** two players against each other: the score, streaks, the biggest upset, both ratings on one chart, their best-played games and every game between them. Open one from a profile's head-to-head table or a game page.
@@ -55,6 +56,7 @@ Play on a real board, log the result in a few taps, and your opponent confirms i
 | **Backend** | Java 21, Spring Boot 4 (Web MVC, Data JPA, Security with Nimbus JOSE for JWT), Flyway, PostgreSQL |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, React Router, Recharts, Lucide; typed nb/en i18n |
 | **Auth** | Stateless JWT in HttpOnly cookies, rotating refresh tokens with reuse detection, BCrypt, CSRF double-submit, login lockout |
+| **Chess rules (server)** | Own move generator in plain Java (`chess` package), checked against the published perft counts |
 | **Tests** | JUnit 6 unit tests plus API tests that run the real app against PostgreSQL; Vitest + Testing Library on the frontend |
 | **Hosting** | Vercel (frontend + `/api` proxy) · Render (API, Docker) · Neon (Postgres), all on free tiers |
 

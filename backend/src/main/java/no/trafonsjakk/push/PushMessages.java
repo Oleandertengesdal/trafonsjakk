@@ -19,6 +19,21 @@ final class PushMessages {
                 "/games/" + e.gameId(), "confirm-" + e.gameId());
     }
 
+    /** To a member someone challenged to an online game. */
+    static Message challenge(PushEvents.ChallengeReceived e) {
+        String what = e.timeControl().endsWith("d")
+                ? "Dagsparti, " + e.timeControl().substring(0, e.timeControl().length() - 1) + " dager per trekk"
+                : "Parti med klokke, " + e.timeControl();
+        return new Message(e.challenger() + " utfordrer deg", what + (e.rated() ? ", ratet" : ", uratet")
+                + ". Trykk for å svare.", "/play", "challenge-" + e.challengeId());
+    }
+
+    /** To the player whose turn it is in a daily game. One per game: a newer move replaces it. */
+    static Message yourMove(PushEvents.YourMove e) {
+        return new Message("Ditt trekk mot " + e.opponent(), e.opponent() + " spilte " + e.lastMove() + ".",
+                "/play/" + e.onlineGameId(), "move-" + e.onlineGameId());
+    }
+
     static Message test() {
         return new Message("Varsler er på", "Her kommer beskjed når noen registrerer et parti mot deg.", "/settings", "test");
     }

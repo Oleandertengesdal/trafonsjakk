@@ -75,6 +75,13 @@ public class Game {
     @JoinColumn(name = "tournament_match_id")
     private TournamentMatch match;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10, updatable = false)
+    private GameMode mode = GameMode.OTB;
+
+    @Column(name = "time_control", length = 12, updatable = false)
+    private String timeControl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -223,6 +230,20 @@ public class Game {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public GameMode getMode() {
+        return mode;
+    }
+
+    public String getTimeControl() {
+        return timeControl;
+    }
+
+    /** Marks a new game as played online with this time control ("10+5", "3d"). Its moves were refereed by the server. */
+    public void playedOnline(String timeControl) {
+        this.mode = GameMode.ONLINE;
+        this.timeControl = timeControl;
     }
 
     /** The winner's user, or null for a draw. */

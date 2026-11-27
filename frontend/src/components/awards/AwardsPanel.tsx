@@ -112,12 +112,12 @@ function Standings({ race, live }: { race: AwardRace; live: boolean }) {
                 <td className={cn('px-5 py-2.5 font-display font-semibold tabular-nums', place === 1 && s.qualified ? 'text-gold' : 'text-faint')}>
                   {s.qualified ? place : ''}
                 </td>
-                <td className="py-2.5">
+                <td className="w-full max-w-0 py-2.5">
                   <Link to={`/players/${s.player.username}`} className="flex items-center gap-3 hover:text-accent">
                     <Avatar name={s.player.realName} seed={s.player.username} size="sm" />
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 font-medium">
-                        <span className="truncate">{s.player.realName}</span>
+                        <span className="min-w-0 break-words">{s.player.realName}</span>
                         {s.player.id === winnerId && <AwardIcon kind="PLAYER_OF_MONTH" label={a.kind.PLAYER_OF_MONTH} />}
                         {s.player.id === active?.player.id && <AwardIcon kind="MOST_ACTIVE" label={a.kind.MOST_ACTIVE} />}
                       </span>
@@ -175,12 +175,12 @@ function AccuracyStandings({ race, live }: { race: AwardRace; live: boolean }) {
                   <td className={cn('px-5 py-2.5 font-display font-semibold tabular-nums', place === 1 && s.qualified ? 'text-gold' : 'text-faint')}>
                     {s.qualified ? place : ''}
                   </td>
-                  <td className="py-2.5">
+                  <td className="w-full max-w-0 py-2.5">
                     <Link to={`/players/${s.player.username}`} className="flex items-center gap-3 hover:text-accent">
                       <Avatar name={s.player.realName} seed={s.player.username} size="sm" />
                       <span className="min-w-0">
                         <span className="flex items-center gap-1.5 font-medium">
-                          <span className="truncate">{s.player.realName}</span>
+                          <span className="min-w-0 break-words">{s.player.realName}</span>
                           {s.player.id === winnerId && <AwardIcon kind="MOST_ACCURATE" label={a.kind.MOST_ACCURATE} />}
                         </span>
                         {!s.qualified && <span className="block text-[0.8125rem] text-faint">{a.gamesOf(s.games, race.minGames)}</span>}

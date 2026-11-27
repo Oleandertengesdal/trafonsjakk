@@ -83,14 +83,17 @@ public class GameMapper {
                     m.getRoundNumber());
         }
 
-        return new GameDto(g.getId(), PlayerRef.of(g.getWhite()), PlayerRef.of(g.getBlack()), g.getResult(),
+        boolean online = g.getMode() == GameMode.ONLINE;
+        return new GameDto(g.getId(), PlayerRef.of(g.getWhite(), g.getMode()), PlayerRef.of(g.getBlack(), g.getMode()), g.getResult(),
                 g.getStatus(), g.getPlayedAt(), g.getCreatedAt(), PlayerRef.of(g.getReportedBy()),
                 PlayerRef.of(g.getConfirmedBy()), g.getConfirmedAt(), autoConfirmAt, g.getOpening(), g.getEco(),
                 g.getNotes(), g.getMoves(), g.getDisputeReason(), tournament, ratingChange(g, rows),
                 canConfirm, canConfirm, canWithdraw,
-                g.getStatus() != GameStatus.VOIDED && (g.involves(actor.id()) || actor.admin()),
+                // The moves of an online game are the server's record of what was played
+                !online && g.getStatus() != GameStatus.VOIDED && (g.involves(actor.id()) || actor.admin()),
                 social.comments(), social.kudos(), social.kudosMine(),
-                g.getStatus() == GameStatus.CONFIRMED && !g.involves(actor.id()));
+                g.getStatus() == GameStatus.CONFIRMED && !g.involves(actor.id()),
+                g.getMode(), g.getTimeControl());
     }
 
     private static RatingChange ratingChange(Game g, List<RatingHistory> rows) {

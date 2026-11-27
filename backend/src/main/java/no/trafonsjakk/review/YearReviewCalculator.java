@@ -21,11 +21,13 @@ public final class YearReviewCalculator {
 
     /**
      * One confirmed game. {@code date} is the local (Norwegian) date. {@code whiteExpected} is white's expected score
-     * before the game (black's is 1 minus it). Ratings are before/after the game.
+     * before the game (black's is 1 minus it). Ratings are before/after the game, in the game's own pool:
+     * {@code online} games have the online rating, so the rating line (start, end, peak, by month, climbers)
+     * leaves them out, unless a player played only online that year.
      */
     public record GameRow(long id, Instant playedAt, LocalDate date, long whiteId, long blackId, double whiteScore,
                           String opening, double whiteBefore, double whiteAfter, double blackBefore, double blackAfter,
-                          double whiteExpected, int kudos, int comments, boolean hasMoves) {
+                          double whiteExpected, int kudos, int comments, boolean hasMoves, boolean online) {
     }
 
     public enum AwardKind { PLAYER_OF_MONTH, MOST_ACTIVE, MOST_ACCURATE }
@@ -111,7 +113,13 @@ public final class YearReviewCalculator {
         int draws = 0;
         int losses = 0;
         double points = 0;
-        double peak = before(mine.getFirst(), me);
+        // The rating line follows one pool: over the board, or online for someone who only played online
+        List<GameRow> line = mine.stream().filter(g -> !g.online()).toList();
+        if (line.isEmpty()) {
+            line = mine;
+        }
+        boolean lineOnline = line.getFirst().online();
+        double peak = before(line.getFirst(), me);
         Map<YearMonth, double[]> months = new TreeMap<>(); // games, wins, draws, losses, overExpected, ratingChange
         TreeMap<YearMonth, Double> endOfMonth = new TreeMap<>();
         Map<Long, int[]> opponents = new LinkedHashMap<>();   // games, wins, draws, losses
@@ -138,14 +146,16 @@ public final class YearReviewCalculator {
             } else {
                 draws++;
             }
-            peak = Math.max(peak, a);
             YearMonth ym = YearMonth.from(g.date());
+            if (g.online() == lineOnline) {
+                peak = Math.max(peak, a);
+                endOfMonth.put(ym, a);
+            }
             double[] m = months.computeIfAbsent(ym, k -> new double[6]);
             m[0]++;
             m[s == 1 ? 1 : s == 0 ? 3 : 2]++;
             m[4] += s - exp;
             m[5] += a - b;
-            endOfMonth.put(ym, a);
 
             int[] o = opponents.computeIfAbsent(opp, k -> new int[4]);
             o[0]++;
@@ -222,7 +232,7 @@ public final class YearReviewCalculator {
         int rank = 1 + (int) counts.values().stream().filter(n -> n > myGames).count();
 
         return new PlayerYear(me, myGames, wins, draws, losses, points,
-                before(mine.getFirst(), me), after(mine.getLast(), me), peak, byMonth, best, upset, rival,
+                before(line.getFirst(), me), after(line.getLast(), me), peak, byMonth, best, upset, rival,
                 longestWinStreaks(games).getOrDefault(me, null), opening, busiest(weekdays), months.size(), kudos,
                 withMoves, rank, counts.size(), awards.stream().filter(a -> a.userId() == me).toList());
     }
@@ -282,10 +292,12 @@ public final class YearReviewCalculator {
             p[loScore == 1 ? 1 : loScore == 0 ? 3 : 2]++;
             pairLast.put(key, g.playedAt());
 
-            start.putIfAbsent(g.whiteId(), g.whiteBefore());
-            start.putIfAbsent(g.blackId(), g.blackBefore());
-            end.put(g.whiteId(), g.whiteAfter());
-            end.put(g.blackId(), g.blackAfter());
+            if (!g.online()) { // climbers are measured on the over-the-board rating
+                start.putIfAbsent(g.whiteId(), g.whiteBefore());
+                start.putIfAbsent(g.blackId(), g.blackBefore());
+                end.put(g.whiteId(), g.whiteAfter());
+                end.put(g.blackId(), g.blackAfter());
+            }
         }
 
         MonthCount busiestMonth = perMonth.entrySet().stream()

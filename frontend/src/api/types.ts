@@ -3,6 +3,8 @@
 export type Role = 'USER' | 'ADMIN'
 export type GameResult = 'WHITE_WIN' | 'BLACK_WIN' | 'DRAW'
 export type GameStatus = 'PENDING' | 'CONFIRMED' | 'DISPUTED' | 'VOIDED'
+/** Over the board (logged afterwards) or online (played on the site). Each has its own rating. */
+export type GameMode = 'OTB' | 'ONLINE'
 export type TournamentFormat = 'ROUND_ROBIN' | 'SINGLE_ELIMINATION' | 'SWISS'
 export type TournamentStatus = 'REGISTRATION' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type MatchStatus = 'WAITING' | 'READY' | 'COMPLETED' | 'BYE'
@@ -27,6 +29,18 @@ export interface Profile extends PlayerRef {
   memberSince: string
   ratedGames: number
   peakRating: number
+  /** The separate online rating. */
+  online: OnlineRating
+}
+
+export interface OnlineRating {
+  rating: number
+  rd: number
+  provisional: boolean
+  /** Rated online games played. */
+  games: number
+  peak: number
+  rank: number | null
 }
 
 export interface RatingDelta {
@@ -61,6 +75,9 @@ export interface Game {
   kudosCount: number
   kudosGivenByMe: boolean
   canGiveKudos: boolean
+  mode: GameMode
+  /** Online games: "10+5" or "3d". */
+  timeControl: string | null
 }
 
 export interface GameComment {
@@ -304,6 +321,15 @@ export interface Calibration {
   high: number | null
 }
 
+export interface RatingPoint {
+  date: string
+  rating: number
+  rd: number
+  gameId: number | null
+  opponent: string | null
+  result: 'W' | 'D' | 'L' | null
+}
+
 export interface LeaderboardRow {
   rank: number | null
   player: PlayerRef
@@ -335,7 +361,11 @@ export interface Stats {
     longestUnbeaten: number
     current: { type: 'WIN' | 'DRAW' | 'LOSS' | null; length: number }
   }
-  ratingHistory: { date: string; rating: number; rd: number; gameId: number | null; opponent: string | null; result: 'W' | 'D' | 'L' | null }[]
+  ratingHistory: RatingPoint[]
+  /** The online rating's own line. */
+  onlineRatingHistory: RatingPoint[]
+  /** Where the online line starts (the over-the-board rating it began from), or null. */
+  onlineStartRating: number | null
   peakRating: number
   lowestRating: number
   headToHead: (Tally & { opponent: PlayerRef; lastPlayedAt: string })[]
@@ -498,4 +528,106 @@ export interface Rivalry {
   /** Their best-played analysed games against each other. */
   bestGames: { gameId: number; playedAt: string; aAccuracy: number; bAccuracy: number; average: number }[]
   games: Game[]
+}
+
+// ---- online play ------------------------------------------------------------------------------------
+
+export type Colour = 'WHITE' | 'BLACK'
+export type ChallengeColour = Colour | 'RANDOM'
+export type ClockKind = 'LIVE' | 'DAILY'
+export type OnlineStatus = 'ACTIVE' | 'FINISHED' | 'ABORTED'
+export type EndReason =
+  | 'CHECKMATE'
+  | 'STALEMATE'
+  | 'REPETITION'
+  | 'FIFTY_MOVES'
+  | 'INSUFFICIENT_MATERIAL'
+  | 'RESIGNATION'
+  | 'AGREEMENT'
+  | 'TIMEOUT'
+  | 'TIMEOUT_VS_INSUFFICIENT'
+
+export interface TimeControl {
+  kind: ClockKind
+  initialSeconds: number
+  incrementSeconds: number
+  daysPerMove: number
+  /** "10+5" or "3d" */
+  label: string
+}
+
+/** Players carry their online rating. {@code opponent} null: open to anyone. */
+export interface Challenge {
+  id: number
+  createdBy: PlayerRef
+  opponent: PlayerRef | null
+  /** The colour the creator plays. */
+  colour: ChallengeColour
+  rated: boolean
+  timeControl: TimeControl
+  createdAt: string
+  expiresAt: string
+}
+
+export interface ChallengeRequest {
+  opponentId: number | null
+  colour: ChallengeColour
+  rated: boolean
+  kind: ClockKind
+  initialSeconds?: number
+  incrementSeconds?: number
+  daysPerMove?: number
+}
+
+/** As of {@code serverTime}; the page counts down from there. */
+export interface OnlineClock {
+  whiteMs: number
+  blackMs: number
+  running: boolean
+  toMove: Colour
+  serverTime: string
+  /** Before both first moves: when the next one has to come, or the game is cancelled. */
+  firstMoveBy: string | null
+  /** Daily games: when the side to move has to have moved. */
+  deadline: string | null
+}
+
+export interface OnlineGame {
+  id: number
+  white: PlayerRef
+  black: PlayerRef
+  rated: boolean
+  timeControl: TimeControl
+  status: OnlineStatus
+  result: GameResult | null
+  endReason: EndReason | null
+  moves: string | null
+  plies: number
+  /** "e2e4" */
+  lastMove: string | null
+  fen: string
+  turn: Colour
+  clock: OnlineClock
+  drawOfferBy: number | null
+  /** Null for a spectator. */
+  myColour: Colour | null
+  canAbort: boolean
+  /** The confirmed game it became (rated games with a result). */
+  gameId: number | null
+  ratingChange: { white: RatingDelta; black: RatingDelta } | null
+  startedAt: string
+  endedAt: string | null
+  version: number
+}
+
+export interface Lobby {
+  challengesToMe: Challenge[]
+  myChallenges: Challenge[]
+  openChallenges: Challenge[]
+  myGames: OnlineGame[]
+  /** My games where it's my move, clock games first. */
+  myTurn: OnlineGame[]
+  /** Every game being played. */
+  playing: OnlineGame[]
+  recent: OnlineGame[]
 }

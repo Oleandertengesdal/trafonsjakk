@@ -1,8 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen, House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Ticket, TrendingUp, Trophy, UserRound, WifiOff } from 'lucide-react'
-import { gamesApi } from '../../api/endpoints'
+import { BookOpen, House, ListOrdered, LogOut, MessageSquareWarning, Plus, Radio, Settings, Shield, Swords, Ticket, TrendingUp, Trophy, UserRound, WifiOff } from 'lucide-react'
+import { gamesApi, onlineApi } from '../../api/endpoints'
 import { useAuth } from '../../auth/AuthProvider'
 import { useI18n } from '../../i18n/I18nProvider'
 import { cn } from '../../lib/cn'
@@ -21,6 +21,9 @@ export function AppShell() {
   const { t } = useI18n()
   const pending = useQuery({ queryKey: ['pending'], queryFn: gamesApi.pending, refetchInterval: 60_000 })
   const pendingCount = pending.data?.length ?? 0
+  // Challenges waiting for an answer, and games where it's your move
+  const lobby = useQuery({ queryKey: ['online', 'lobby'], queryFn: onlineApi.lobby, refetchInterval: 30_000 })
+  const playCount = (lobby.data?.challengesToMe.length ?? 0) + (lobby.data?.myTurn.length ?? 0)
   const { pathname } = useLocation()
   const online = useOnline()
   useEffect(() => {
@@ -30,6 +33,7 @@ export function AppShell() {
 
   const primaryNav: NavItem[] = [
     { to: '/', label: t.nav.home, icon: House, end: true, badge: pendingCount },
+    { to: '/play', label: t.nav.play, icon: Swords, badge: playCount },
     { to: '/games', label: t.nav.games, icon: ListOrdered },
     { to: '/leaderboard', label: t.nav.ratings, icon: TrendingUp },
     { to: '/tournaments', label: t.nav.tournaments, icon: Trophy },
@@ -151,7 +155,7 @@ export function AppShell() {
           <span className="-mt-6 flex size-14 items-center justify-center rounded-full border-4 border-page bg-brand text-on-accent shadow-[inset_0_-3px_0_rgb(0_0_0/0.2)]">
             <Plus aria-hidden className="size-6" />
           </span>
-          <span className="max-w-full truncate text-[0.6875rem] text-muted">{t.nav.logGame}</span>
+          <span className="max-w-full text-center text-[0.6875rem] leading-tight text-muted">{t.nav.logGame}</span>
         </Link>
         <TabLink {...primaryNav[2]} badgeLabel={t.nav.waitingForYou} />
         <TabLink {...primaryNav[3]} badgeLabel={t.nav.waitingForYou} />
@@ -191,7 +195,7 @@ function TabLink({ to, label, icon: Icon, end, badge = 0, badgeLabel }: NavItem 
       className={({ isActive }) => cn('relative flex min-w-0 flex-col items-center gap-1 py-1 text-[0.6875rem]', isActive ? 'text-accent' : 'text-muted')}
     >
       <Icon aria-hidden className="size-5.5" />
-      <span className="max-w-full truncate">{label}</span>
+      <span className="max-w-full text-center leading-tight">{label}</span>
       {badge > 0 && <span role="img" className="absolute top-0.5 right-[calc(50%-1rem)] size-2 rounded-full bg-[#b8862a]" aria-label={badgeLabel(badge)} />}
     </NavLink>
   )

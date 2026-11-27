@@ -18,6 +18,7 @@ import no.trafonsjakk.stats.PlayerStatsCalculator.Tally;
 import no.trafonsjakk.tournament.TournamentRepository;
 import no.trafonsjakk.user.PlayerRef;
 import no.trafonsjakk.user.User;
+import no.trafonsjakk.user.UserDtos.OnlineRating;
 import no.trafonsjakk.user.UserDtos.Profile;
 import no.trafonsjakk.user.UserRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -65,7 +66,7 @@ public class StatsService {
                         Streaks streaks, List<RatingPoint> ratingHistory, int peakRating, int lowestRating,
                         List<HeadToHead> headToHead, Nemesis nemesis, Victim favoriteVictim, BestWin bestWin,
                         Opening favoriteOpening, List<String> recentForm, List<Month> activity,
-                        long tournamentWins) {
+                        long tournamentWins, List<RatingPoint> onlineRatingHistory, Integer onlineStartRating) {
     }
 
     /** A confirmed game as the statistics need it: no moves, no notes, no loaded players. */
@@ -96,7 +97,8 @@ public class StatsService {
         PlayerRef p = PlayerRef.of(u);
         int peak = (int) Math.round(Math.max(u.getPeakRating(), u.isProvisional() ? 0 : u.getRating()));
         return new Profile(p.id(), p.username(), p.realName(), p.rating(), p.rd(), p.provisional(), u.getRole(),
-                leaderboard.rankOf(u.getId()), u.getCreatedAt(), u.getRatedGames(), peak);
+                leaderboard.rankOf(u.getId()), u.getCreatedAt(), u.getRatedGames(), peak,
+                OnlineRating.of(u, leaderboard.onlineRankOf(u.getId())));
     }
 
     @Transactional(readOnly = true)
@@ -132,26 +134,18 @@ public class StatsService {
         }
         PlayerStatsCalculator.Result r = PlayerStatsCalculator.compute(myId, records, Instant.now());
 
-        List<RatingPoint> points = new ArrayList<>();
+        // The graph and its peak and lowest are over the board; the online rating has its own line
+        List<RatingPoint> points = ratingPoints(history.findForUser(myId, "OTB"), gameById, people, myId);
+        List<RatingHistory> onlineRows = history.findForUser(myId, "ONLINE");
+        List<RatingPoint> onlinePoints = ratingPoints(onlineRows, gameById, people, myId);
+        // Where the online line starts: the over-the-board rating it was seeded from
+        Integer onlineStart = onlineRows.isEmpty() ? null : (int) Math.round(onlineRows.getFirst().getRatingBefore());
         // Everyone starts at 1500, so that's the baseline for peak/lowest.
         int peak = 1500;
         int lowest = 1500;
-        for (RatingHistory h : history.findForUser(myId)) {
-            PlayedGame g = gameById.get(h.getGameId());
-            String opponent = null;
-            String res = null;
-            if (g != null) {
-                boolean white = g.whiteId() == myId;
-                User opp = people.get(white ? g.blackId() : g.whiteId());
-                opponent = opp == null ? null : opp.getUsername();
-                double s = white ? g.result().whiteScore() : 1 - g.result().whiteScore();
-                res = s == 1 ? "W" : s == 0.5 ? "D" : "L";
-            }
-            int rating = (int) Math.round(h.getRatingAfter());
-            peak = Math.max(peak, rating);
-            lowest = Math.min(lowest, rating);
-            points.add(new RatingPoint(h.getPlayedAt(), rating, (int) Math.round(h.getRdAfter()), h.getGameId(),
-                    opponent, res));
+        for (RatingPoint pt : points) {
+            peak = Math.max(peak, pt.rating());
+            lowest = Math.min(lowest, pt.rating());
         }
 
         Tally t = r.totals();
@@ -186,7 +180,29 @@ public class StatsService {
                     case LOSS -> "L";
                 }).toList(),
                 r.activity().stream().map(m -> new Month(m.month(), m.games())).toList(),
-                tournaments.countWins(myId));
+                tournaments.countWins(myId),
+                onlinePoints,
+                onlineStart);
+    }
+
+    private static List<RatingPoint> ratingPoints(List<RatingHistory> rows, Map<Long, PlayedGame> gameById,
+                                                  Map<Long, User> people, long myId) {
+        List<RatingPoint> points = new ArrayList<>(rows.size());
+        for (RatingHistory h : rows) {
+            PlayedGame g = gameById.get(h.getGameId());
+            String opponent = null;
+            String res = null;
+            if (g != null) {
+                boolean white = g.whiteId() == myId;
+                User opp = people.get(white ? g.blackId() : g.whiteId());
+                opponent = opp == null ? null : opp.getUsername();
+                double s = white ? g.result().whiteScore() : 1 - g.result().whiteScore();
+                res = s == 1 ? "W" : s == 0.5 ? "D" : "L";
+            }
+            points.add(new RatingPoint(h.getPlayedAt(), (int) Math.round(h.getRatingAfter()),
+                    (int) Math.round(h.getRdAfter()), h.getGameId(), opponent, res));
+        }
+        return points;
     }
 
     private static ColorStats color(Tally t) {

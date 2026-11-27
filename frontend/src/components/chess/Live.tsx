@@ -22,7 +22,7 @@ export function LiveRow({ game }: { game: LiveGame }) {
           <Avatar name={game.black.realName} seed={game.black.username} size="sm" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium group-hover:text-accent">
+          <span className="block font-medium break-words group-hover:text-accent">
             {game.white.realName} <span className="font-normal text-muted">{t.live.vs}</span> {game.black.realName}
           </span>
           <span className="flex flex-wrap gap-x-3 text-sm text-muted">

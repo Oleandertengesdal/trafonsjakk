@@ -21,8 +21,19 @@ public final class UserDtos {
         }
     }
 
+    /** {@code rating}, {@code rd} … are over the board; {@code online} is the separate online rating. */
     public record Profile(long id, String username, String realName, int rating, int rd, boolean provisional,
-                          Role role, Integer rank, Instant memberSince, int ratedGames, int peakRating) {
+                          Role role, Integer rank, Instant memberSince, int ratedGames, int peakRating,
+                          OnlineRating online) {
+    }
+
+    /** {@code games}: rated online games. {@code peak}: the highest established online rating. */
+    public record OnlineRating(int rating, int rd, boolean provisional, int games, int peak, Integer rank) {
+        public static OnlineRating of(User u, Integer rank) {
+            int peak = (int) Math.round(Math.max(u.getOnlinePeakRating(), u.isOnlineProvisional() ? 0 : u.getOnlineRating()));
+            return new OnlineRating((int) Math.round(u.getOnlineRating()), (int) Math.round(u.getOnlineRatingDeviation()),
+                    u.isOnlineProvisional(), u.getOnlineRatedGames(), peak, rank);
+        }
     }
 
     public record UpdateMeRequest(

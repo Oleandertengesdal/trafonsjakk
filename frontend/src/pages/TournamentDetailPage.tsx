@@ -90,11 +90,11 @@ export function TournamentDetailPage() {
           {d.participants.length === 0 ? (
             <p className="px-5 pb-5 text-muted">{td.nobody}</p>
           ) : (
-            <ul className="grid gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-1 p-2 sm:grid-cols-2 lg:grid-cols-3">
               {d.participants.map(({ player }) => (
                 <li key={player.id} className="flex items-center gap-3 rounded-control px-3 py-2.5">
                   <Avatar name={player.realName} seed={player.username} size="sm" />
-                  <Link to={`/players/${player.username}`} className="flex-1 truncate hover:text-accent">
+                  <Link to={`/players/${player.username}`} className="min-w-0 flex-1 break-words hover:text-accent">
                     {player.realName}
                   </Link>
                   <Rating value={player.rating} provisional={player.provisional} className="text-sm text-muted" />
@@ -220,23 +220,25 @@ function SwissView({ detail: d }: { detail: TournamentDetail }) {
             <caption className="sr-only">{td.standings}</caption>
             <thead>
               <tr className="text-left text-[0.8125rem] text-muted">
-                <th scope="col" className="w-12 px-5 py-2 font-medium">#</th>
+                <th scope="col" className="w-9 px-3 py-2 font-medium sm:w-12 sm:px-5">#</th>
                 <th scope="col" className="py-2 font-medium">{td.player}</th>
                 <th scope="col" className="px-3 py-2 text-right font-medium">{td.points}</th>
                 <th scope="col" className="hidden px-3 py-2 text-right font-medium sm:table-cell">{t.leaderboard.wdl}</th>
-                <th scope="col" className="px-5 py-2 text-right font-medium" title={td.buchholzHint}>
-                  {td.buchholz}
+                <th scope="col" aria-label={td.buchholz} className="px-3 py-2 text-right font-medium sm:px-5" title={td.buchholzHint}>
+                  {/* Phones: the full word takes the room the names need */}
+                  <span className="sm:hidden">{td.buchholzShort}</span>
+                  <span className="hidden sm:inline">{td.buchholz}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               {(d.standings ?? []).map((s) => (
                 <tr key={s.player.id} className="border-t border-line">
-                  <td className={cn('px-5 py-2.5 font-display font-semibold tabular-nums', s.rank === 1 ? 'text-gold' : 'text-faint')}>{s.rank}</td>
-                  <td className="py-2.5">
+                  <td className={cn('px-3 py-2.5 font-display font-semibold tabular-nums sm:px-5', s.rank === 1 ? 'text-gold' : 'text-faint')}>{s.rank}</td>
+                  <td className="w-full max-w-0 py-2.5">
                     <Link to={`/players/${s.player.username}`} className="flex items-center gap-2.5 hover:text-accent">
                       <Avatar name={s.player.realName} seed={s.player.username} size="sm" />
-                      <span className="truncate">{s.player.realName}</span>
+                      <span className="min-w-0 break-words">{s.player.realName}</span>
                     </Link>
                   </td>
                   <td className="px-3 py-2.5 text-right font-medium tabular-nums">{f.decimal1(s.points).replace(/[.,]0$/, '')}</td>
@@ -244,7 +246,7 @@ function SwissView({ detail: d }: { detail: TournamentDetail }) {
                     {s.wins} / {s.draws} / {s.losses}
                     {s.byes > 0 && <span className="ml-1.5 text-faint">{td.byes(s.byes)}</span>}
                   </td>
-                  <td className="px-5 py-2.5 text-right text-muted tabular-nums">{f.decimal1(s.buchholz ?? 0).replace(/[.,]0$/, '')}</td>
+                  <td className="px-3 py-2.5 text-right text-muted tabular-nums sm:px-5">{f.decimal1(s.buchholz ?? 0).replace(/[.,]0$/, '')}</td>
                 </tr>
               ))}
             </tbody>
@@ -284,8 +286,8 @@ function PairingLine({ match: m }: { match: Match }) {
   if (!m.white || !m.black) return null
   const mine = m.white.id === me!.id || m.black.id === me!.id
   return (
-    <li className="grid grid-cols-[1fr_4.5rem_1fr] items-center gap-2 text-[0.9375rem]">
-      <span className={cn('truncate text-right', m.result === 'WHITE_WIN' && 'font-semibold')}>{m.white.realName}</span>
+    <li className="grid grid-cols-[minmax(0,1fr)_4.5rem_minmax(0,1fr)] items-center gap-2 text-[0.9375rem]">
+      <span className={cn('text-right break-words', m.result === 'WHITE_WIN' && 'font-semibold')}>{m.white.realName}</span>
       <span className="text-center">
         {m.result ? (
           <ResultMark result={m.result} />
@@ -301,7 +303,7 @@ function PairingLine({ match: m }: { match: Match }) {
           <span className="text-faint">–</span>
         )}
       </span>
-      <span className={cn('truncate', m.result === 'BLACK_WIN' && 'font-semibold')}>{m.black.realName}</span>
+      <span className={cn('break-words', m.result === 'BLACK_WIN' && 'font-semibold')}>{m.black.realName}</span>
     </li>
   )
 }

@@ -136,7 +136,7 @@ export function TournamentNewPage() {
           ) : users.isError ? (
             <ErrorNotice error={users.error} onRetry={() => users.refetch()} />
           ) : (
-            <ul className="grid gap-1 p-2 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-1 p-2 sm:grid-cols-2">
               {users.data.map((u) => {
                 const on = selected.has(u.id)
                 return (
@@ -148,7 +148,7 @@ export function TournamentNewPage() {
                       className={cn('flex w-full items-center gap-3 rounded-control px-3 py-2.5 text-left transition-colors', on ? 'bg-accent-soft text-ink' : 'text-muted hover:bg-raised')}
                     >
                       <Avatar name={u.realName} seed={u.username} size="sm" />
-                      <span className="flex-1 truncate">{u.realName}</span>
+                      <span className="min-w-0 flex-1 break-words">{u.realName}</span>
                       <span className="text-[0.8125rem] text-faint tabular-nums">{u.rating}</span>
                       <span className={cn('flex size-5 items-center justify-center rounded-md border', on ? 'border-brand bg-brand text-on-accent' : 'border-line bg-surface')}>
                         {on && <Check aria-hidden className="size-3.5" />}

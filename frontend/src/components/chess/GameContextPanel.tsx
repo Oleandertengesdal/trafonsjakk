@@ -55,11 +55,11 @@ function ContextBody({ game, ctx }: { game: Game; ctx: GameContext }) {
       <section>
         <h3 className="sr-only">{c.expected}</h3>
         <div className="flex items-baseline justify-between gap-4 text-sm">
-          <span className="min-w-0 truncate">
+          <span className="min-w-0 break-words">
             <span className="font-display text-2xl font-semibold tabular-nums">{f.pct(ctx.expected.white)}</span>{' '}
             <span className="text-muted">{white}</span>
           </span>
-          <span className="min-w-0 truncate text-right">
+          <span className="min-w-0 text-right break-words">
             <span className="text-muted">{black}</span>{' '}
             <span className="font-display text-2xl font-semibold tabular-nums">{f.pct(ctx.expected.black)}</span>
           </span>
@@ -94,12 +94,12 @@ function ContextBody({ game, ctx }: { game: Game; ctx: GameContext }) {
         ) : (
           <>
             <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <span className="truncate text-sm text-muted">{white}</span>
+              <span className="min-w-0 text-sm break-words text-muted">{white}</span>
               <span className="text-center">
                 <span className="block font-display text-2xl font-semibold tabular-nums">{c.record(h.whiteWins, h.blackWins)}</span>
                 {h.draws > 0 && <span className="block text-[0.8125rem] text-muted">{c.draws(h.draws)}</span>}
               </span>
-              <span className="truncate text-right text-sm text-muted">{black}</span>
+              <span className="min-w-0 text-right text-sm break-words text-muted">{black}</span>
             </div>
             <div aria-hidden className="mt-2 flex h-2 gap-0.5">
               {h.whiteWins > 0 && <span className={cn('rounded-l-full', LIGHT, h.draws + h.blackWins === 0 && 'rounded-r-full')} style={{ flexGrow: h.whiteWins }} />}

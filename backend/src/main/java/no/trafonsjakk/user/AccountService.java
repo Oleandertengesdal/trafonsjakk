@@ -58,16 +58,17 @@ public class AccountService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("exportedAt", Instant.now());
         out.put("account", rows("""
-                select username, real_name, role, created_at, rating, rating_deviation, rated_games, peak_rating, last_game_at
+                select username, real_name, role, created_at, rating, rating_deviation, rated_games, peak_rating, last_game_at,
+                       online_rating, online_rating_deviation, online_rated_games, online_peak_rating, online_last_game_at
                 from users where id = ?""", id).getFirst());
         out.put("games", rows("""
                 select g.id, w.username as white, b.username as black, g.result, g.status, g.played_at, g.opening, g.eco,
-                       g.notes, g.moves, g.dispute_reason, r.username as reported_by, g.created_at
+                       g.notes, g.moves, g.dispute_reason, r.username as reported_by, g.created_at, g.mode, g.time_control
                 from games g join users w on w.id = g.white_id join users b on b.id = g.black_id
                 join users r on r.id = g.reported_by
                 where g.white_id = ? or g.black_id = ? order by g.played_at, g.id""", id, id));
         out.put("ratingHistory", rows("""
-                select game_id, rating_before, rating_after, rd_after, played_at
+                select game_id, pool, rating_before, rating_after, rd_after, played_at
                 from rating_history where user_id = ? order by played_at, id""", id));
         out.put("comments", rows("""
                 select id, game_id, parent_id, body, created_at, edited_at, deleted_at
@@ -84,6 +85,16 @@ public class AccountService {
                 select l.id, w.username as white, b.username as black, l.status, l.moves, l.game_id, l.started_at, l.updated_at
                 from live_games l join users w on w.id = l.white_id join users b on b.id = l.black_id
                 where l.white_id = ? or l.black_id = ? order by l.started_at""", id, id));
+        out.put("onlineGames", rows("""
+                select o.id, w.username as white, b.username as black, o.rated, o.kind, o.initial_seconds, o.increment_seconds,
+                       o.days_per_move, o.status, o.result, o.end_reason, o.moves, o.game_id, o.started_at, o.ended_at
+                from online_games o join users w on w.id = o.white_id join users b on b.id = o.black_id
+                where o.white_id = ? or o.black_id = ? order by o.started_at, o.id""", id, id));
+        out.put("onlineChallenges", rows("""
+                select c.id, c.created_by = ? as created_by_me, o.username as opponent, c.colour, c.rated, c.kind,
+                       c.initial_seconds, c.increment_seconds, c.days_per_move, c.status, c.created_at, c.expires_at
+                from online_challenges c left join users o on o.id = c.opponent_id
+                where c.created_by = ? or c.opponent_id = ? order by c.created_at, c.id""", id, id, id));
         out.put("invitesCreated", rows("""
                 select created_at, expires_at, max_uses, use_count, revoked_at
                 from invite_codes where created_by = ? order by created_at""", id));
@@ -121,6 +132,11 @@ public class AccountService {
         jdbc.update("delete from push_subscriptions where user_id = ?", id);
         jdbc.update("update invite_codes set revoked_at = ? where created_by = ? and revoked_at is null", Timestamp.from(now), id);
         live.abandonAllFor(id, now);
+        // Online games they're in stop without a result, and their challenges are withdrawn
+        jdbc.update("""
+                update online_games set status = 'ABORTED', ended_at = ?, draw_offer_by = null, version = version + 1
+                where status = 'ACTIVE' and (white_id = ? or black_id = ?)""", Timestamp.from(now), id, id);
+        jdbc.update("update online_challenges set status = 'CANCELLED' where status = 'OPEN' and (created_by = ? or opponent_id = ?)", id, id);
         tokens.revokeAllForUser(id);
 
         byte[] noise = new byte[16];

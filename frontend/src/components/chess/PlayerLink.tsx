@@ -28,7 +28,7 @@ export function PlayerLink({
   return (
     <Link to={`/players/${player.username}`} className={cn('group inline-flex min-w-0 items-center gap-2.5 rounded-md', className)}>
       {showAvatar && <Avatar name={player.realName} seed={player.username} size="sm" />}
-      <span className="min-w-0 truncate font-medium group-hover:text-accent">{player.realName}</span>
+      <span className="min-w-0 font-medium break-words group-hover:text-accent">{player.realName}</span>
       {showRating && <Rating value={player.rating} provisional={player.provisional} className="text-sm text-muted" />}
     </Link>
   )

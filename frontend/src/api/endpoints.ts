@@ -9,7 +9,10 @@ import type {
   CreatedInvite,
   Game,
   GameComment,
+  Challenge,
+  ChallengeRequest,
   GameContext,
+  GameMode,
   GameResult,
   GameStatus,
   GroupYear,
@@ -17,7 +20,9 @@ import type {
   Kudos,
   LeaderboardRow,
   LiveGame,
+  Lobby,
   Me,
+  OnlineGame,
   MyMatch,
   Page,
   PlayerAccuracy,
@@ -148,7 +153,7 @@ export const socialApi = {
 }
 
 export const leaderboardApi = {
-  get: () => api<LeaderboardRow[]>('/api/leaderboard'),
+  get: (pool: GameMode = 'OTB') => api<LeaderboardRow[]>(pool === 'OTB' ? '/api/leaderboard' : `/api/leaderboard?pool=${pool}`),
 }
 
 export const awardsApi = {
@@ -210,4 +215,22 @@ export const liveApi = {
   /** Logs the result as an ordinary game for the opponent to confirm. */
   finish: (id: number, result: GameResult) => api<Game>(`/api/live/${id}/finish`, { method: 'POST', body: json({ result }) }),
   abandon: (id: number) => api<void>(`/api/live/${id}/abandon`, { method: 'POST' }),
+}
+
+export const onlineApi = {
+  lobby: () => api<Lobby>('/api/online'),
+  challenge: (req: ChallengeRequest) => api<Challenge>('/api/online/challenges', { method: 'POST', body: json(req) }),
+  accept: (id: number) => api<OnlineGame>(`/api/online/challenges/${id}/accept`, { method: 'POST' }),
+  decline: (id: number) => api<void>(`/api/online/challenges/${id}/decline`, { method: 'POST' }),
+  cancel: (id: number) => api<void>(`/api/online/challenges/${id}/cancel`, { method: 'POST' }),
+  get: (id: number) => api<OnlineGame>(`/api/online/games/${id}`),
+  /** {@code ply}: the number of half-moves on the board when the move was made; {@code thinkMs}: by this device's clock. */
+  move: (id: number, uci: string, ply: number, thinkMs?: number) =>
+    api<OnlineGame>(`/api/online/games/${id}/moves`, { method: 'POST', body: json({ uci, ply, thinkMs }) }),
+  resign: (id: number) => api<OnlineGame>(`/api/online/games/${id}/resign`, { method: 'POST' }),
+  abort: (id: number) => api<OnlineGame>(`/api/online/games/${id}/abort`, { method: 'POST' }),
+  offerDraw: (id: number) => api<OnlineGame>(`/api/online/games/${id}/offer-draw`, { method: 'POST' }),
+  acceptDraw: (id: number) => api<OnlineGame>(`/api/online/games/${id}/accept-draw`, { method: 'POST' }),
+  declineDraw: (id: number) => api<OnlineGame>(`/api/online/games/${id}/decline-draw`, { method: 'POST' }),
+  rematch: (id: number) => api<Challenge>(`/api/online/games/${id}/rematch`, { method: 'POST' }),
 }

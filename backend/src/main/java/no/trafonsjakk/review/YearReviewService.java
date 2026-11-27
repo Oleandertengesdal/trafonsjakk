@@ -165,7 +165,7 @@ public class YearReviewService {
             rows.add(new GameRow(g.getId(), g.getPlayedAt(), g.getPlayedAt().atZone(zone).toLocalDate(), w, b,
                     g.getResult().whiteScore(), g.getOpening(), wb, wa, bb, ba, expected,
                     kudosByGame.getOrDefault(g.getId(), 0), commentsByGame.getOrDefault(g.getId(), 0),
-                    g.getMoves() != null && !g.getMoves().isBlank()));
+                    g.getMoves() != null && !g.getMoves().isBlank(), g.getMode() == no.trafonsjakk.game.GameMode.ONLINE));
         }
         List<AwardRow> yearAwards = awards.won(null).stream()
                 .filter(a -> a.month().getYear() == year)

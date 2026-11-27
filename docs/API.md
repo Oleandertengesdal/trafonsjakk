@@ -71,8 +71,8 @@ Rules: `username` `^[A-Za-z0-9_]{3,20}$` (unique, case-insensitive) · `realName
 | GET | `/users/{username}/stats` | Statistics dashboard payload (see below) |
 | PATCH | `/users/me` | `{ realName }` |
 | POST | `/users/me/password` | `{ currentPassword, newPassword }`, signs out other sessions. Wrong guesses count toward the login lockout. |
-| GET | `/users/me/export` | Everything stored about you as JSON (`Content-Disposition: attachment`): `account`, `games`, `ratingHistory`, `comments`, `commentLikes`, `kudosGiven`, `monthlyAwards`, `tournaments`, `liveGames`, `invitesCreated`. No password hash, and nothing others wrote. |
-| POST | `/users/me/delete` | `{ password }` → 204 and logged out. Removes the person and keeps their games: the name becomes "Slettet spiller", the username `deleted_<id>`, the password can never match; comments, likes, kudos, open password links and unused invite codes go (a comment others replied to keeps its place without text); their live games stop. Wrong passwords count toward the login lockout (`auth.wrong_current_password`, then `auth.locked`). The only admin can't (`account.last_admin`). |
+| GET | `/users/me/export` | Everything stored about you as JSON (`Content-Disposition: attachment`): `account`, `games`, `ratingHistory`, `comments`, `commentLikes`, `kudosGiven`, `monthlyAwards`, `tournaments`, `liveGames`, `onlineGames`, `onlineChallenges`, `invitesCreated`. No password hash, and nothing others wrote. |
+| POST | `/users/me/delete` | `{ password }` → 204 and logged out. Removes the person and keeps their games: the name becomes "Slettet spiller", the username `deleted_<id>`, the password can never match; comments, likes, kudos, open password links and unused invite codes go (a comment others replied to keeps its place without text); their live games stop, their online games are cancelled without a result and their challenges withdrawn. Wrong passwords count toward the login lockout (`auth.wrong_current_password`, then `auth.locked`). The only admin can't (`account.last_admin`). |
 
 `Stats`:
 
@@ -113,7 +113,7 @@ A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revok
 | POST | `/games/{id}/confirm` | Opponent (or either player if an admin logged it) |
 | POST | `/games/{id}/dispute` | `{ reason }` (5–500 chars) |
 | POST | `/games/{id}/withdraw` | Reporter, while `PENDING` |
-| PATCH | `/games/{id}/moves` | `{ moves }` (PGN/SAN, up to 20 000 chars; blank clears). Either player or an admin, any status except `VOIDED`. Doesn't touch ratings. |
+| PATCH | `/games/{id}/moves` | `{ moves }` (PGN/SAN, up to 20 000 chars; blank clears). Either player or an admin, any status except `VOIDED`. Doesn't touch ratings. Not for online games (`game.online_moves`, 409): their moves are what was played. |
 | GET | `/games/{id}/context` | `{ expected: { white, black }, upset, meeting, headToHead: { games, whiteWins, draws, blackWins, firstPlayedAt }, recent: { id, playedAt, whiteId, result }[] }`. See below. |
 
 | GET | `/games/{id}/comments` | Threads, oldest first: `{ id, parentId, author, replyTo, body, createdAt, editedAt, deleted, likeCount, likedByMe, likedBy, canEdit, canDelete, canLike, replies }[]`. `replies` holds the thread's answers, oldest first (one level, like Facebook). |
@@ -126,7 +126,7 @@ A code is `ACTIVE` until it's used `maxUses` times (`USED`), expires or is revok
 | PUT | `/games/{id}/kudos` | Give kudos (idempotent). Not on your own game (`kudos.own_game`), only once confirmed (`kudos.not_confirmed`). |
 | DELETE | `/games/{id}/kudos` | Take it back (idempotent) |
 
-Every game also carries `canEditMoves`, `commentCount`, `kudosCount`, `kudosGivenByMe` and `canGiveKudos`.
+Every game also carries `canEditMoves`, `commentCount`, `kudosCount`, `kudosGivenByMe`, `canGiveKudos`, `mode` (`OTB` or `ONLINE`) and `timeControl` (`"10+5"`, `"3d"`; null over the board). For an online game the players' `rating` is their online rating.
 
 **Game context.** `expected` is each side's Glicko-2 expected score, from the ratings just before the game (the rating history) once it's confirmed, otherwise from current ratings; `black = 1 − white`. `upset` is true for a confirmed decisive game whose winner had an expected score below 0.35. `headToHead` counts the confirmed games between the two, with wins seen from this game's sides; `meeting` is this game's number among them (null if it isn't confirmed). `recent` is up to five of their other confirmed games, newest first.
 
@@ -134,7 +134,9 @@ Moves are checked for legality in the app (chess.js) before they're sent; the se
 
 ## Leaderboard
 
-`GET /leaderboard` → `{ rank, player: PlayerRef, games, wins, draws, losses, lastPlayedAt, trend }[]`. `trend` is the rating change over the player's last 5 games. Provisional players are listed after ranked ones, with `rank: null`.
+`GET /leaderboard?pool=` → `{ rank, player: PlayerRef, games, wins, draws, losses, lastPlayedAt, trend }[]`. `trend` is the rating change over the player's last 5 games. Provisional players are listed after ranked ones, with `rank: null`. `pool` is `OTB` (default: over the board, counting only those games) or `ONLINE` (the online rating and online games; only players who have played a rated online game). Anything else is `request.malformed`.
+
+Profiles (`GET /users/{username}`) add `online: { rating, rd, provisional, games, peak, rank }`; statistics add `onlineRatingHistory` (the same points as `ratingHistory`, for the online rating) and `onlineStartRating` (where that line starts). `ratingHistory`, `peakRating` and `lowestRating` are over the board.
 
 ## Monthly awards ("Månedens spiller")
 
@@ -221,7 +223,7 @@ The website builds the move tree and names the openings itself (chess.js and the
 
 ## Push notifications
 
-Optional: on when the server has a VAPID key pair (`PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY`). When a game is logged and waits for confirmation, the players who have to confirm it get a notification on every browser they turned notifications on in (the tag `confirm-<id>`, tapping it opens `/games/<id>`).
+Optional: on when the server has a VAPID key pair (`PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY`). When a game is logged and waits for confirmation, the players who have to confirm it get a notification on every browser they turned notifications on in (the tag `confirm-<id>`, tapping it opens `/games/<id>`). Online play adds two: a member who is challenged (`challenge-<id>`, opens `/play`), and in daily games the player whose move it is (`move-<id>`, opens `/play/<id>`; a newer move replaces it). Clock games send none per move: they're played with the page open.
 
 | Method | Path | Notes |
 |---|---|---|
@@ -286,6 +288,35 @@ A game being played right now. A player (or an admin) records it on a phone: eve
 | PUT | `/live/{id}/moves` | `{ moves, version }` → the updated game. Players or admins; `live.out_of_date` (409) if someone saved since `version`, `live.not_running` once it has ended. Same limits as a game's moves (20 000 characters, plain text). |
 | POST | `/live/{id}/finish` | `{ result }` → 201 `GameDto` (pending, for the opponent to confirm) |
 | POST | `/live/{id}/abandon` | → 204. Ends it without a result. |
+
+## Online play
+
+Games played on the website, with the server as arbiter: it checks every move against the rules and keeps the clock. Pages poll (the free API has no WebSockets); nothing ticks on the server: a game whose time is up ends the next time anyone reads it, moves, opens the lobby, or within a minute.
+
+**Time controls.** `LIVE`: `initialSeconds` 60–10 800 plus `incrementSeconds` 0–60 added after each move. `DAILY`: `daysPerMove` 1–14, a deadline per move that doesn't accumulate. Otherwise `online.bad_time_control`. The label is `"10+5"` or `"3d"`.
+
+**The clock.** The first move of each side is free but must come within 60 s (daily: within the deadline), or the game is cancelled without a result (`ABORTED`). After that, thinking time is taken off the bank. A move sends `thinkMs`, the phone's own count; the server charges that, but never less than what it measured minus 1.5 s (`Clock.LAG_ALLOWANCE`), so network delay isn't charged and claiming too little saves at most 1.5 s. A flag only counts once those 1.5 s have also passed. Out of time against a lone king, or a king with one knight or bishop, is a draw (`TIMEOUT_VS_INSUFFICIENT`).
+
+**Endings** (`endReason`): `CHECKMATE`, `STALEMATE`, `REPETITION` (threefold, automatic), `FIFTY_MOVES` (automatic), `INSUFFICIENT_MATERIAL`, `RESIGNATION`, `AGREEMENT`, `TIMEOUT`, `TIMEOUT_VS_INSUFFICIENT`. A **rated** game with a result becomes an ordinary game, already `CONFIRMED` (`mode: ONLINE`, `played_at` = when it ended), which moves the online rating and counts everywhere games do. A casual game stays only here.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/online` | The lobby: `{ challengesToMe, myChallenges, openChallenges, myGames, myTurn, playing, recent }`. Also ends games whose time is up. |
+| POST | `/online/challenges` | `{ opponentId?, colour: WHITE\|BLACK\|RANDOM, rated, kind: LIVE\|DAILY, initialSeconds?, incrementSeconds?, daysPerMove? }` → 201 `ChallengeDto`. No `opponentId`: open to anyone. `colour` is the creator's. Live challenges expire after an hour, daily after a week; at most 20 open (`online.too_many_challenges`). Not yourself (`game.same_player`). The opponent gets a push notification. |
+| POST | `/online/challenges/{id}/accept` | → 201 `OnlineGameDto`. Not your own (`online.own_challenge`), not someone else's (`online.not_for_you`, 403), only while open (`online.challenge_closed`). Nobody plays two clock games at once (`online.already_playing`); daily games, as many as you like. |
+| POST | `/online/challenges/{id}/decline` | The person challenged → 204 |
+| POST | `/online/challenges/{id}/cancel` | The creator (or an admin) → 204 (`online.not_yours`) |
+| GET | `/online/games/{id}` | `OnlineGameDto` (`online.not_found`). Anyone may watch. |
+| POST | `/online/games/{id}/moves` | `{ uci: "e2e4"\|"e7e8q", ply, thinkMs? }` → the game. `ply` is the number of half-moves the board had: a stale or repeated move is `online.out_of_date`. Then `online.not_your_turn`, `online.illegal_move` (400). A move that arrives after the flag fell ends the game on time and answers `online.game_over`. |
+| POST | `/online/games/{id}/resign` | Before both have moved this just cancels the game. |
+| POST | `/online/games/{id}/abort` | Before both have moved (`online.cannot_abort`) |
+| POST | `/online/games/{id}/offer-draw` | An offer lapses when the opponent moves; offering when the opponent already has agrees the draw. |
+| POST | `/online/games/{id}/accept-draw` / `decline-draw` | `online.no_draw_offer` if there's none from the opponent |
+| POST | `/online/games/{id}/rematch` | After the game: the same settings, colours swapped, as a challenge to the opponent → 201 `ChallengeDto` (`online.still_playing`) |
+
+Every command is for the players only (`online.not_a_player`, 403) and answers `online.game_over` (409) once the game has ended.
+
+`OnlineGameDto`: `{ id, white, black, rated, timeControl: { kind, initialSeconds, incrementSeconds, daysPerMove, label }, status: ACTIVE|FINISHED|ABORTED, result, endReason, moves, plies, lastMove, fen, turn, clock: { whiteMs, blackMs, running, toMove, serverTime, firstMoveBy, deadline }, drawOfferBy, myColour, canAbort, gameId, ratingChange, startedAt, endedAt, version }`. Times are as of `serverTime`; the page counts down from when the answer arrived. `myColour` is null for a spectator. Players carry their online rating.
 
 ## Tournaments
 
